@@ -2,9 +2,9 @@
 import json
 
 from flask import Blueprint, current_app, g, jsonify, request
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import feed, matching, nlp
+from . import feed, matching, nlp, security
 from .auth import (
     create_session,
     current_user,
@@ -15,6 +15,7 @@ from .auth import (
 from .db import get_db, is_unique_violation
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+_DUMMY_HASH = generate_password_hash("dummy-password-for-timing")
 
 
 @bp.post("/register")
@@ -26,6 +27,9 @@ def register():
     err = validate_credentials(email, password, name)
     if err:
         return jsonify({"error": err}), 400
+    if security.signup_blocked():
+        return jsonify({"error": "محاولات تسجيل كتير، جرّب بعد شوية"}), 429
+    security.record_signup()
     try:
         uid = register_user(email, password, name)
     except Exception as exc:
@@ -40,10 +44,18 @@ def login():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    if len(email) > 254 or len(password) > 128:
+        return jsonify({"error": "البريد أو كلمة المرور غير صحيحة"}), 401
+    if security.login_blocked(email):
+        return jsonify({"error": "محاولات كتير غلط. استنى 15 دقيقة وجرّب تاني"}), 429
     db = get_db()
     row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if row is None:
+        check_password_hash(_DUMMY_HASH, password)  # same timing as a real check
     if row is None or not check_password_hash(row["password_hash"], password):
+        security.record_login_failure(email)
         return jsonify({"error": "البريد أو كلمة المرور غير صحيحة"}), 401
+    security.clear("fail_email", email)
     token = create_session(row["id"])
     return jsonify({"token": token, "user": {"id": row["id"], "email": row["email"], "name": row["name"]}})
 

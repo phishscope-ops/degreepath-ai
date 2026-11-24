@@ -39,7 +39,8 @@ def current_user():
     db = get_db()
     row = db.execute(
         """SELECT u.id, u.email, u.name FROM sessions s
-           JOIN users u ON u.id = s.user_id WHERE s.token = ?""",
+           JOIN users u ON u.id = s.user_id WHERE s.token = ?
+           AND s.created_at > datetime('now', '-43200 minutes')""",
         (token,),
     ).fetchone()
     return dict(row) if row else None
@@ -60,8 +61,14 @@ def login_required(fn):
 def validate_credentials(email, password, name=None):
     if not EMAIL_RE.match(email or ""):
         return "البريد الإلكتروني غير صالح"
-    if not password or len(password) < 6:
-        return "كلمة المرور لازم تكون 6 أحرف على الأقل"
+    if len(email or "") > 254:
+        return "البريد الإلكتروني غير صالح"
+    if not password or len(password) < 8:
+        return "كلمة المرور لازم تكون 8 أحرف على الأقل"
+    if len(password) > 128:
+        return "كلمة المرور طويلة جداً"
     if name is not None and not name.strip():
         return "الاسم مطلوب"
+    if name is not None and len(name) > 100:
+        return "الاسم طويل جداً"
     return None

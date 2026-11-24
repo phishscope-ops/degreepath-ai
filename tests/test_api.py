@@ -213,3 +213,32 @@ def test_feed_field_classifier():
     assert feed.classify_field("Arabic Teacher") == "edu"
     assert feed.classify_field("Backend Developer") == "tech"
     assert feed.classify_field("zzz") == "other"
+
+
+def test_login_lockout_after_repeated_failures(client):
+    client.post("/api/register", json={"email": "lock@example.com", "password": "secret123", "name": "L"})
+    for _ in range(5):
+        assert client.post("/api/login", json={"email": "lock@example.com", "password": "bad"}).status_code == 401
+    # locked now, even with the right password
+    assert client.post("/api/login", json={"email": "lock@example.com", "password": "secret123"}).status_code == 429
+
+
+def test_short_password_and_security_headers(client):
+    res = client.post("/api/register", json={"email": "s@example.com", "password": "1234567", "name": "S"})
+    assert res.status_code == 400
+    res = client.get("/health")
+    assert res.headers["X-Content-Type-Options"] == "nosniff"
+    assert res.headers["X-Frame-Options"] == "DENY"
+
+
+def test_expired_session_rejected(client):
+    r = client.post("/api/register", json={"email": "e@example.com", "password": "secret123", "name": "E"})
+    token = r.get_json()["token"]
+    h = {"Authorization": f"Bearer {token}"}
+    assert client.get("/api/me", headers=h).status_code == 200
+    from degreepath.db import get_db
+    with client.application.app_context():
+        db = get_db()
+        db.execute("UPDATE sessions SET created_at = datetime('now', '-50000 minutes')")
+        db.commit()
+    assert client.get("/api/me", headers=h).status_code == 401

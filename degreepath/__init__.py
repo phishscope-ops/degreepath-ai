@@ -16,6 +16,17 @@ def create_app(test_config=None):
         app.config.update(test_config)
 
     app.json.ensure_ascii = False
+    app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+
+    # Render terminates TLS at a proxy: trust exactly one hop for the client IP.
+    if os.environ.get("RENDER") or os.environ.get("TRUST_PROXY") == "1":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=0)
+
+    from . import security
+
+    app.after_request(security.add_headers)
 
     from . import db
 
@@ -29,6 +40,9 @@ def create_app(test_config=None):
 
     from .admin import bp as admin_bp
     from .api import bp as api_bp
+
+    with app.app_context():
+        security.purge_old()
 
     app.register_blueprint(api_bp)
     app.register_blueprint(admin_bp)

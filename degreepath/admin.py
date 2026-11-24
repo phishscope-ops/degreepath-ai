@@ -13,6 +13,7 @@ from functools import wraps
 
 from flask import Blueprint, current_app, jsonify, request
 
+from . import security
 from .db import get_db
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
@@ -30,7 +31,8 @@ def _is_admin():
     if not token:
         return False
     row = get_db().execute(
-        "SELECT token FROM admin_sessions WHERE token = ?", (token,)
+        "SELECT token FROM admin_sessions WHERE token = ? "
+        "AND created_at > datetime('now', '-720 minutes')", (token,)
     ).fetchone()
     return row is not None
 
@@ -53,7 +55,12 @@ def login():
         return jsonify({"error": "لوحة المالك غير مفعّلة"}), 403
     data = request.get_json(silent=True) or {}
     password = data.get("password") or ""
-    if not secrets.compare_digest(password, _password()):
+    if security.admin_blocked():
+        return jsonify({"error": "محاولات كتير غلط. استنى 15 دقيقة"}), 429
+    if not isinstance(password, str) or not secrets.compare_digest(
+        password.encode(), _password().encode()
+    ):
+        security.record_admin_failure()
         time.sleep(1)  # blunt password guessing
         return jsonify({"error": "كلمة المرور غير صحيحة"}), 401
     token = secrets.token_urlsafe(32)
