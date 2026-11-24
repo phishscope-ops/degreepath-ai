@@ -210,7 +210,107 @@ NEW_JOBS = [
     ),
 ]
 
-JOBS = JOBS + NEW_JOBS
+MORE_JOBS = [
+    (
+        "Game Developer (Unity)", "مطور ألعاب (Unity)", "games",
+        "Design and build games with Unity and C#: gameplay mechanics, physics, "
+        "UI and publishing for mobile and PC.",
+        [
+            ("C#", 3), ("Unity", 3), ("Game Design", 2), ("OOP", 2),
+            ("Problem Solving", 2), ("Git", 1), ("UI/UX Design", 1), ("Testing", 1),
+        ],
+    ),
+    (
+        "Network Engineer", "مهندس شبكات", "it",
+        "Design, install and support company networks: routing, switching, "
+        "firewalls and connectivity for branches and data centers.",
+        [
+            ("Networking", 3), ("Cisco (CCNA)", 3), ("Linux", 2),
+            ("Windows Server", 2), ("Active Directory", 1), ("Cybersecurity", 1),
+            ("Problem Solving", 1), ("Technical Support", 1),
+        ],
+    ),
+    (
+        "Penetration Tester", "مختبر اختراق", "security",
+        "Test systems and applications for weaknesses before attackers find them: "
+        "reconnaissance, exploitation and clear reporting.",
+        [
+            ("Penetration Testing", 3), ("Cybersecurity", 3), ("Networking", 2),
+            ("Linux", 2), ("Python", 1), ("Bash", 1), ("Research", 1),
+            ("Report Writing", 1),
+        ],
+    ),
+    (
+        "System Administrator", "مسؤول أنظمة", "it",
+        "Run and secure company servers: Linux and Windows administration, "
+        "user management, backups and automation with scripts.",
+        [
+            ("Linux", 3), ("Windows Server", 3), ("Active Directory", 2),
+            ("Networking", 2), ("Bash", 2), ("Cybersecurity", 1),
+            ("Problem Solving", 1),
+        ],
+    ),
+    (
+        "Blockchain Developer", "مطور بلوكتشين", "web3",
+        "Build smart contracts and decentralized apps: Solidity on Ethereum, "
+        "Web3 tooling and secure contract design.",
+        [
+            ("Blockchain", 3), ("Solidity", 3), ("JavaScript", 2), ("OOP", 2),
+            ("Git", 2), ("REST APIs", 1), ("Data Structures", 1),
+            ("Problem Solving", 1),
+        ],
+    ),
+    (
+        "iOS Developer", "مطور تطبيقات iOS", "mobile",
+        "Build iPhone and iPad apps with Swift and SwiftUI: clean UI, REST API "
+        "integration, push notifications and App Store publishing.",
+        [
+            ("Swift", 3), ("SwiftUI", 3), ("Mobile Development", 3), ("OOP", 2),
+            ("Git", 2), ("Firebase", 1), ("REST APIs", 1), ("UI/UX Design", 1),
+            ("Testing", 1),
+        ],
+    ),
+    (
+        "Product Manager", "مدير منتج", "business",
+        "Own the product direction: understand users, prioritize features with "
+        "the team, and follow delivery with Agile methods and data.",
+        [
+            ("Product Management", 3), ("Communication", 3), ("Agile/Scrum", 2),
+            ("Business Analysis", 2), ("Project Management", 2), ("Data Analysis", 1),
+            ("UI/UX Design", 1), ("English", 1),
+        ],
+    ),
+    (
+        "Graphic Designer", "مصمم جرافيك", "design",
+        "Create visual identities, social media designs and marketing material "
+        "with Photoshop and Illustrator, from concept to final artwork.",
+        [
+            ("Graphic Design", 3), ("Adobe Photoshop", 3), ("Adobe Illustrator", 2),
+            ("UI/UX Design", 1), ("Communication", 1), ("Research", 1),
+            ("Teamwork", 1),
+        ],
+    ),
+    (
+        "Motion Graphics Designer", "مصمم موشن جرافيك", "design",
+        "Animate logos, ads and explainer videos: motion principles, After "
+        "Effects, and editing short videos for social media.",
+        [
+            ("Motion Graphics", 3), ("Video Editing", 2), ("Graphic Design", 2),
+            ("Communication", 1), ("Research", 1),
+        ],
+    ),
+    (
+        "Technical Writer", "كاتب تقني", "business",
+        "Write clear documentation, user guides and API references for software "
+        "products, working closely with engineers.",
+        [
+            ("Technical Writing", 3), ("English", 3), ("Report Writing", 2),
+            ("Communication", 2), ("Research", 2),
+        ],
+    ),
+]
+
+JOBS = JOBS + NEW_JOBS + MORE_JOBS
 
 # Free learning resources per skill: (skill name, title, url, kind)
 RESOURCES = [
@@ -305,6 +405,27 @@ RESOURCES = [
     ("Prompt Engineering", "ChatGPT Prompt Engineering for Developers (free)", "https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers/", "course"),
     ("Active Directory", "Active Directory on Microsoft Learn", "https://learn.microsoft.com/training/browse/?terms=active%20directory", "course"),
     ("Technical Support", "Google IT Support (audit free on Coursera)", "https://www.coursera.org/professional-certificates/google-it-support", "course"),
+    ("Unity", "Unity Learn (official free courses)", "https://learn.unity.com/", "course"),
+    ("Game Design", "Game Design and Development (audit free on Coursera)", "https://www.coursera.org/specializations/game-design-and-development", "course"),
+    ("Cisco (CCNA)", "Cisco Networking Academy (free courses)", "https://www.netacad.com/", "course"),
+    ("Penetration Testing", "TryHackMe (free rooms)", "https://tryhackme.com/", "practice"),
+    ("Penetration Testing", "HackTheBox Academy (free tier)", "https://academy.hackthebox.com/", "course"),
+    ("Windows Server", "Windows Server on Microsoft Learn", "https://learn.microsoft.com/training/browse/?terms=windows%20server", "course"),
+    ("Bash", "Learn Shell (interactive, free)", "https://www.learnshell.org/", "practice"),
+    ("Bash", "GNU Bash manual", "https://www.gnu.org/software/bash/manual/", "docs"),
+    ("Solidity", "CryptoZombies (learn Solidity by building)", "https://cryptozombies.io/", "course"),
+    ("Solidity", "Solidity official docs", "https://docs.soliditylang.org/", "docs"),
+    ("Blockchain", "Blockchain Basics (audit free on Coursera)", "https://www.coursera.org/learn/blockchain-basics", "course"),
+    ("SwiftUI", "Apple SwiftUI tutorials (official)", "https://developer.apple.com/tutorials/swiftui", "docs"),
+    ("Product Management", "Mind the Product (articles & guides)", "https://www.mindtheproduct.com/", "docs"),
+    ("Agile/Scrum", "Atlassian Agile Coach", "https://www.atlassian.com/agile", "course"),
+    ("Agile/Scrum", "The Scrum Guide (official)", "https://scrumguides.org/", "docs"),
+    ("Graphic Design", "Canva Design School (free)", "https://www.canva.com/designschool/", "course"),
+    ("Adobe Photoshop", "Adobe Photoshop tutorials (official)", "https://helpx.adobe.com/photoshop/tutorials.html", "video"),
+    ("Adobe Illustrator", "Adobe Illustrator tutorials (official)", "https://helpx.adobe.com/illustrator/tutorials.html", "video"),
+    ("Video Editing", "DaVinci Resolve free training", "https://www.blackmagicdesign.com/products/davinciresolve/training", "course"),
+    ("Motion Graphics", "After Effects tutorials (official)", "https://helpx.adobe.com/after-effects/tutorials.html", "video"),
+    ("Technical Writing", "Google Technical Writing Courses (free)", "https://developers.google.com/tech-writing", "course"),
 ]
 
 

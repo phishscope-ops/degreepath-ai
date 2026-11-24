@@ -1,6 +1,5 @@
 """REST API blueprint."""
 import json
-import sqlite3
 
 from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash
@@ -13,7 +12,7 @@ from .auth import (
     register_user,
     validate_credentials,
 )
-from .db import get_db
+from .db import get_db, is_unique_violation
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -29,7 +28,9 @@ def register():
         return jsonify({"error": err}), 400
     try:
         uid = register_user(email, password, name)
-    except sqlite3.IntegrityError:
+    except Exception as exc:
+        if not is_unique_violation(exc):
+            raise
         return jsonify({"error": "البريد ده مسجل قبل كده، جرّب تسجيل الدخول"}), 409
     return jsonify({"token": create_session(uid), "user": {"id": uid, "email": email, "name": name}}), 201
 
@@ -359,7 +360,7 @@ def feed_status():
             for r in courses if r["source"] in feed.SOURCE_INFO
         ],
         "total_jobs": sum(r["c"] for r in jobs),
-        "egypt_jobs": db.execute("SELECT COUNT(*) FROM live_jobs WHERE country='EG'").fetchone()[0],
+        "egypt_jobs": db.execute("SELECT COUNT(*) AS n FROM live_jobs WHERE country='EG'").fetchone()["n"],
         "job_fields": [
             {"field": r["f"], "label": feed.FIELD_LABELS.get(r["f"], r["f"]), "count": r["c"]}
             for r in db.execute(
@@ -457,7 +458,7 @@ def feed_courses():
         where.append("source = ?")
         args.append(source)
     w = (" WHERE " + " AND ".join(where)) if where else ""
-    total = db.execute("SELECT COUNT(*) FROM live_courses" + w, args).fetchone()[0]
+    total = db.execute("SELECT COUNT(*) AS n FROM live_courses" + w, args).fetchone()["n"]
     rows = db.execute(
         "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses" + w
         + " ORDER BY (source='coursera') DESC, id LIMIT ? OFFSET ?", args + [limit, offset]).fetchall()

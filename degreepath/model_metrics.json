@@ -1,15 +1,15 @@
 {
   "model": "OneVsRest LogisticRegression over TF-IDF (word 1-2g + char 3-5g)",
-  "training_samples": 4934,
-  "test_samples": 987,
-  "labels": 81,
+  "training_samples": 5753,
+  "test_samples": 1151,
+  "labels": 98,
   "held_out": {
-    "micro_precision": 0.9941,
-    "micro_recall": 0.7716,
-    "micro_f1": 0.8689,
-    "macro_precision": 0.9949,
-    "macro_recall": 0.7752,
-    "macro_f1": 0.8658
+    "micro_precision": 0.9844,
+    "micro_recall": 0.7686,
+    "micro_f1": 0.8632,
+    "macro_precision": 0.986,
+    "macro_recall": 0.7703,
+    "macro_f1": 0.8571
   },
   "note": "Data is taxonomy-derived synthetic sentences plus seed catalog/job descriptions; metrics measure generalization to new phrasings of the same skill vocabulary, not to an arbitrary unseen domain."
 }

@@ -15,7 +15,6 @@ cannot be fetched again.
 import html
 import json
 import re
-import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -272,28 +271,32 @@ def _title_skill_ids(title, tags, alias_index):
 
 
 def _connect(db_path):
-    db = sqlite3.connect(db_path, timeout=60)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA busy_timeout=60000")
-    db.execute("PRAGMA foreign_keys = ON")
-    return db
+    from . import db as dbmod
+
+    return dbmod.connect_dsn(db_path)
 
 
 def claim_run(db_path):
     """Cross-worker guard: return a new run id, or None if a run started <20 min ago is unfinished."""
+    from . import db as dbmod
+
+    pg = dbmod.is_pg_dsn(db_path)
     db = _connect(db_path)
     try:
-        db.execute("BEGIN IMMEDIATE")
+        if not pg:
+            db.execute("BEGIN IMMEDIATE")
         busy = db.execute(
             """SELECT 1 FROM feed_runs WHERE finished_at IS NULL
                AND started_at > datetime('now', '-20 minutes')"""
         ).fetchone()
         if busy:
-            db.execute("ROLLBACK")
+            if pg:
+                db.rollback()
+            else:
+                db.execute("ROLLBACK")
             return None
         rid = db.execute("INSERT INTO feed_runs (started_at) VALUES (datetime('now'))").lastrowid
-        db.execute("COMMIT")
+        db.commit()
         return rid
     finally:
         db.close()

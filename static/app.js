@@ -1,4 +1,4 @@
-/* DegreePath AI - frontend SPA (vanilla JS, hash routing) */
+/* مسارك (DegreePath AI) - frontend SPA (vanilla JS, hash routing) */
 
 const state = {
   token: localStorage.getItem("dp_token") || null,

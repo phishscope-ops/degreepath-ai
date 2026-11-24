@@ -1,4 +1,4 @@
-# DegreePath AI
+# مسارك (DegreePath AI)
 
 **Your Degree · Your Skills · Your Future**
 
@@ -134,9 +134,29 @@ match % = مجموع أوزان المهارات المتوفرة عند الط�
 
 ## قاعدة البيانات
 
-SQLite (ملف `degreepath.sqlite3` بيتعمل تلقائيًا ويتملى بالبيانات الأولية عند
-أول تشغيل). الجداول: users, sessions, profiles, courses, course_skills,
-skills, skill_aliases, jobs, job_skills, resources, course_catalog, analyses.
+- محليًا: SQLite (ملف `degreepath.sqlite3` بيتعمل تلقائيًا ويتملى بالبيانات
+  الأولية عند أول تشغيل).
+- على الاستضافة: PostgreSQL خارجي (Neon) لما متغير البيئة `DATABASE_URL` يكون
+  فيه رابط اتصال postgres. الكود بيترجم تلقائيًا بين الاتنين، والحسابات
+  والبيانات بتفضل محفوظة بين عمليات النشر.
+- الجداول: users, sessions, admin_sessions, profiles, courses, course_skills,
+  skills, skill_aliases, jobs, job_skills, resources, course_catalog, analyses,
+  live_jobs, live_job_skills, live_courses, live_course_skills, feed_runs.
+
+## لوحة المالك (v1.5)
+
+صفحة `/admin` خاصة بصاحب المنصة بس: إحصائيات التسجيل وجدول بكل الحسابات
+المسجلة (الاسم، البريد، الجامعة، التخصص، الوظيفة المستهدفة، عدد المواد
+والمهارات والتحليلات، تاريخ التسجيل). بتتفتح بكلمة مرور المالك اللي بتتحط
+في متغير البيئة `ADMIN_PASSWORD` (لو مش موجود، اللوحة مقفولة). القراءة فقط،
+مفيش أي تعديل على بيانات المستخدمين منها.
+
+## البقاء صاحي على Render المجاني (v1.5)
+
+الخدمة المجانية على Render بتنام بعد 15 دقيقة من غير زيارات. عند النشر
+(Render بيملأ `RENDER_EXTERNAL_URL` تلقائيًا) ثريد داخلي بيعمل ping لـ
+`/health` كل 10 دقايق فالموقع يفضل صاحي. `/health` مش بيلمس قاعدة البيانات،
+فحصة Neon المجانية مش بتتأثر. الإيقاف: `KEEPALIVE_SELF_PING=0`.
 
 ## ملاحظات معروفة
 
