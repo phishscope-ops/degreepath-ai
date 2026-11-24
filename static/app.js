@@ -527,7 +527,9 @@ const routes = {
   profile: showProfile,
 };
 
+let routeSeq = 0;
 async function route() {
+  const seq = ++routeSeq;
   const hash = location.hash || "#/dashboard";
   const parts = hash.slice(2).split("/");
   const page = parts[0] || "dashboard";
@@ -541,14 +543,14 @@ async function route() {
   }
   if (page === "feed" && parts[1]) {
     try { await showFeedDetail(parts[1]); } catch (err) {
-      if (err instanceof Stale) return;
+      if (err instanceof Stale || seq !== routeSeq) return;
       app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
     return;
   }
   if (page === "jobs" && parts[1]) {
     try { await showJobDetail(parts[1]); } catch (err) {
-      if (err instanceof Stale) return;
+      if (err instanceof Stale || seq !== routeSeq) return;
       if (state.token) app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
     return;
@@ -557,7 +559,7 @@ async function route() {
   try {
     await view();
   } catch (err) {
-    if (err instanceof Stale) return;
+    if (err instanceof Stale || seq !== routeSeq) return;
     if (state.token) {
       app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
