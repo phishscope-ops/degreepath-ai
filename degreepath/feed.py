@@ -208,15 +208,42 @@ def _title_skill_ids(title, tags, alias_index):
     return set(nlp.extract_skills(f"{title} {tags}", alias_index))
 
 
-def refresh(db_path):
+def _connect(db_path):
+    db = sqlite3.connect(db_path, timeout=60)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA busy_timeout=60000")
+    db.execute("PRAGMA foreign_keys = ON")
+    return db
+
+
+def claim_run(db_path):
+    """Cross-worker guard: return a new run id, or None if a run started <20 min ago is unfinished."""
+    db = _connect(db_path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        busy = db.execute(
+            """SELECT 1 FROM feed_runs WHERE finished_at IS NULL
+               AND started_at > datetime('now', '-20 minutes')"""
+        ).fetchone()
+        if busy:
+            db.execute("ROLLBACK")
+            return None
+        rid = db.execute("INSERT INTO feed_runs (started_at) VALUES (datetime('now'))").lastrowid
+        db.execute("COMMIT")
+        return rid
+    finally:
+        db.close()
+
+
+def refresh(db_path, run_id=None):
     """Fetch every source, store jobs/courses, tag them with skills. Returns a report."""
     started = _now()
     report = {"started_at": started, "sources": {}}
-    db = sqlite3.connect(db_path, timeout=60)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-    run_id = db.execute("INSERT INTO feed_runs (started_at) VALUES (?)", (started,)).lastrowid
-    db.commit()
+    db = _connect(db_path)
+    if run_id is None:
+        run_id = db.execute("INSERT INTO feed_runs (started_at) VALUES (?)", (started,)).lastrowid
+        db.commit()
     alias_index = nlp.build_alias_index(db)
 
     for src, fn in JOB_FETCHERS.items():
@@ -252,6 +279,7 @@ def refresh(db_path):
                 for sid in ids:
                     db.execute("INSERT INTO live_job_skills (job_id, skill_id, importance) VALUES (?,?,?)",
                                (jid, sid, 3 if sid in core else 2))
+                db.commit()
             # source succeeded: drop its rows that were not in this fetch (expired jobs)
             db.execute("DELETE FROM live_jobs WHERE source=? AND fetched_at < ?", (src, started))
             db.commit()
@@ -284,6 +312,8 @@ def refresh(db_path):
                     db.execute("INSERT INTO live_course_skills (course_id, skill_id) VALUES (?,?)",
                                (cid, sid))
                 stored += 1
+                if stored % 100 == 0:
+                    db.commit()
             db.execute("DELETE FROM live_courses WHERE source=? AND fetched_at < ?", (src, started))
             db.commit()
             report["sources"][src] = {"ok": True, "fetched": len(items), "stored": stored}
@@ -330,12 +360,15 @@ def refresh_in_background(app):
     with _lock:
         if _running:
             return False
+        run_id = claim_run(app.config["DATABASE"])
+        if run_id is None:
+            return False
         _running = True
 
     def work():
         global _running
         try:
-            refresh(app.config["DATABASE"])
+            refresh(app.config["DATABASE"], run_id)
         except Exception:
             pass
         finally:
@@ -346,8 +379,15 @@ def refresh_in_background(app):
     return True
 
 
-def is_running():
-    return _running
+def is_running(db=None):
+    if _running:
+        return True
+    if db is not None:
+        return db.execute(
+            """SELECT 1 FROM feed_runs WHERE finished_at IS NULL
+               AND started_at > datetime('now', '-20 minutes')"""
+        ).fetchone() is not None
+    return False
 
 
 def maybe_refresh(app, db):

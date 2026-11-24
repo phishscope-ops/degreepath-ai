@@ -342,7 +342,7 @@ def feed_status():
     courses = db.execute("SELECT source, COUNT(*) AS c FROM live_courses GROUP BY source").fetchall()
     last = feed.last_run(db)
     return jsonify({
-        "refreshing": feed.is_running(),
+        "refreshing": feed.is_running(db),
         "stale_after_hours": feed.STALE_HOURS,
         "last_refresh_utc": last["finished_at"] if last else None,
         "job_sources": [
@@ -436,7 +436,7 @@ def feed_job_detail(job_id):
 def feed_refresh():
     db = get_db()
     last = feed.last_run(db)
-    if feed.is_running():
+    if feed.is_running(db):
         return jsonify({"started": False, "message": "التحديث شغال دلوقتي"}), 202
     if last:
         try:
