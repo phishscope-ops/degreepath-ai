@@ -86,4 +86,6 @@ def add_headers(resp):
     h.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     if request.path.startswith("/api/") or request.path == "/admin":
         h["Cache-Control"] = "no-store"
+    elif request.path == "/" or request.path.endswith((".js", ".css", ".html")):
+        h["Cache-Control"] = "no-cache"
     return resp

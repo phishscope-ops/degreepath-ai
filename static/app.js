@@ -36,10 +36,19 @@ async function api(path, opts = {}) {
   return data;
 }
 
+let navId = 0;
+class Stale extends Error {}
+
 function render(templateId) {
   const tpl = document.getElementById(templateId);
   app.innerHTML = "";
   app.appendChild(tpl.content.cloneNode(true));
+  return ++navId;
+}
+
+// After any await, a newer navigation may have replaced the page. Stop quietly.
+function alive(nav) {
+  if (nav !== navId) throw new Stale();
 }
 
 function esc(s) {
@@ -66,7 +75,7 @@ function importanceLabel(i) {
 
 function showAuth() {
   navbar.classList.add("hidden");
-  render("tpl-auth");
+  const nav = render("tpl-auth");
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
   const tabLogin = document.getElementById("tabLogin");
@@ -135,12 +144,13 @@ function showNav(route) {
 
 async function showDashboard() {
   showNav("dashboard");
-  render("tpl-dashboard");
+  const nav = render("tpl-dashboard");
   const [skillsData, matchesData, profileData] = await Promise.all([
     api("/skills"),
     api("/matches"),
     api("/profile"),
   ]);
+  alive(nav);
 
   const summary = document.getElementById("dashSummary");
   const best = matchesData.matches[0];
@@ -177,12 +187,13 @@ async function showDashboard() {
 
 async function showCourses() {
   showNav("courses");
-  render("tpl-courses");
+  const nav = render("tpl-courses");
   const form = document.getElementById("courseForm");
   const result = document.getElementById("courseResult");
 
   async function refresh() {
     const [coursesData, skillsData] = await Promise.all([api("/courses"), api("/skills")]);
+    alive(nav);
     document.getElementById("allSkills").innerHTML =
       skillsData.skills.map((s) => skillChip(s, "have")).join("") ||
       `<span class="muted">لسه مفيش مهارات مستخرجة.</span>`;
@@ -212,13 +223,15 @@ async function showCourses() {
   const catalogError = document.getElementById("catalogError");
   try {
     const catalogData = await api("/catalog");
+    alive(nav);
     catalogSelect.innerHTML = catalogData.catalog
       .map(
         (c) =>
           `<option value="${c.id}">[مستوى ${c.level} - ترم ${c.semester}] ${esc(c.title)}</option>`
       )
       .join("");
-  } catch (_) {
+  } catch (e) {
+    if (e instanceof Stale) return;
     catalogSelect.innerHTML = "<option>تعذر تحميل القائمة</option>";
   }
   document.getElementById("catalogAddBtn").onclick = async () => {
@@ -262,8 +275,9 @@ async function showCourses() {
 
 async function showJobs() {
   showNav("jobs");
-  render("tpl-jobs");
+  const nav = render("tpl-jobs");
   const data = await api("/jobs");
+  alive(nav);
   document.getElementById("jobsList").innerHTML = data.jobs
     .map(
       (j) => `
@@ -281,11 +295,12 @@ async function showJobs() {
 
 async function showJobDetail(jobId) {
   showNav("jobs");
-  render("tpl-job-detail");
+  const nav = render("tpl-job-detail");
   const [jobData, analysis] = await Promise.all([
     api("/jobs/" + jobId),
     api("/analysis/" + jobId),
   ]);
+  alive(nav);
   const j = jobData.job;
   const el = document.getElementById("jobDetail");
   el.innerHTML = `
@@ -332,8 +347,9 @@ async function showJobDetail(jobId) {
 
 async function showProfile() {
   showNav("profile");
-  render("tpl-profile");
+  const nav = render("tpl-profile");
   const [profileData, jobsData] = await Promise.all([api("/profile"), api("/jobs")]);
+  alive(nav);
   const p = profileData.profile || {};
   const form = document.getElementById("profileForm");
   form.university.value = p.university || "";
@@ -402,7 +418,7 @@ function courseCard(c) {
   </a>`;
 }
 
-async function loadFeed(append) {
+async function loadFeed(append, nav = navId) {
   const q = document.getElementById("feedQ").value.trim();
   const sort = document.getElementById("feedSort").value;
   const isJobs = feedState.tab === "jobs";
@@ -411,6 +427,7 @@ async function loadFeed(append) {
   if (feedState.field) params.set("field", feedState.field);
   if (isJobs && feedState.country) params.set("country", feedState.country);
   const data = await api((isJobs ? "/feed/jobs?" : "/feed/courses?") + params.toString());
+  alive(nav);
   const items = isJobs ? data.jobs : data.courses;
   const list = document.getElementById("feedList");
   const html = items.map(isJobs ? feedCard : courseCard).join("");
@@ -421,7 +438,7 @@ async function loadFeed(append) {
   more.innerHTML = feedState.offset < data.total
     ? `<button class="btn primary block" id="feedMoreBtn">عرض المزيد (${data.total - feedState.offset})</button>` : "";
   const btn = document.getElementById("feedMoreBtn");
-  if (btn) btn.onclick = () => loadFeed(true);
+  if (btn) btn.onclick = () => loadFeed(true, nav);
 }
 
 function drawFilters() {
@@ -440,8 +457,9 @@ function drawFilters() {
 
 async function showFeed() {
   showNav("feed");
-  render("tpl-feed");
+  const nav = render("tpl-feed");
   const st = await api("/feed/status");
+  alive(nav);
   feedState.st = st;
   const when = st.last_refresh_utc ? st.last_refresh_utc.slice(0, 16) + " UTC" : "لسه";
   document.getElementById("feedStatus").textContent = st.total_jobs
@@ -464,13 +482,14 @@ async function showFeed() {
   let timer;
   document.getElementById("feedQ").oninput = () => { clearTimeout(timer); timer = setTimeout(() => loadFeed(false), 350); };
   document.getElementById("feedSort").onchange = () => loadFeed(false);
-  await loadFeed(false);
+  await loadFeed(false, nav);
 }
 
 async function showFeedDetail(id) {
   showNav("feed");
-  render("tpl-feed-detail");
+  const nav = render("tpl-feed-detail");
   const { job: j } = await api("/feed/jobs/" + id);
+  alive(nav);
   const have = j.matched.map((s) => skillChip(s, "have")).join("") || '<span class="muted">لسه مفيش</span>';
   const steps = j.roadmap.map((st) => `
     <div class="card">
@@ -522,18 +541,23 @@ async function route() {
   }
   if (page === "feed" && parts[1]) {
     try { await showFeedDetail(parts[1]); } catch (err) {
+      if (err instanceof Stale) return;
       app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
     return;
   }
   if (page === "jobs" && parts[1]) {
-    await showJobDetail(parts[1]);
+    try { await showJobDetail(parts[1]); } catch (err) {
+      if (err instanceof Stale) return;
+      if (state.token) app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
+    }
     return;
   }
   const view = routes[page] || showDashboard;
   try {
     await view();
   } catch (err) {
+    if (err instanceof Stale) return;
     if (state.token) {
       app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
@@ -549,5 +573,8 @@ document.getElementById("logoutBtn").onclick = async (e) => {
   location.hash = "#/auth";
 };
 
+window.addEventListener("unhandledrejection", (e) => {
+  if (e.reason instanceof Stale) e.preventDefault();
+});
 window.addEventListener("hashchange", route);
 route();
