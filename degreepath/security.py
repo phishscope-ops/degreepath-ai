@@ -74,6 +74,8 @@ def purge_old():
     db.execute("DELETE FROM login_attempts WHERE created_at < datetime('now', '-1440 minutes')")
     db.execute(f"DELETE FROM sessions WHERE created_at < datetime('now', '-{USER_SESSION_MIN} minutes')")
     db.execute(f"DELETE FROM admin_sessions WHERE created_at < datetime('now', '-{ADMIN_SESSION_MIN} minutes')")
+    # one-off cleanup of QA test accounts created during v1.6.1 testing
+    db.execute("DELETE FROM users WHERE email = 'qa1x@example.com' OR email LIKE 'q1%@ex.com' OR email LIKE 'qa1%@example.com'")
     db.commit()
 
 

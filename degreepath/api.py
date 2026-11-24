@@ -251,16 +251,19 @@ def extract_preview():
 def list_jobs():
     db = get_db()
     jobs = db.execute("SELECT id, title, title_ar, category, description FROM jobs").fetchall()
+    rows = db.execute(
+        """SELECT js.job_id, s.id, s.name, s.name_ar, js.importance FROM job_skills js
+           JOIN skills s ON s.id = js.skill_id
+           ORDER BY js.importance DESC, s.name"""
+    ).fetchall()
+    by_job = {}
+    for r in rows:
+        by_job.setdefault(r["job_id"], []).append(
+            {"id": r["id"], "name": r["name"], "name_ar": r["name_ar"], "importance": r["importance"]})
     out = []
     for j in jobs:
-        reqs = db.execute(
-            """SELECT s.id, s.name, s.name_ar, js.importance FROM job_skills js
-               JOIN skills s ON s.id = js.skill_id
-               WHERE js.job_id = ? ORDER BY js.importance DESC, s.name""",
-            (j["id"],),
-        ).fetchall()
         d = dict(j)
-        d["required_skills"] = [dict(r) for r in reqs]
+        d["required_skills"] = by_job.get(j["id"], [])
         out.append(d)
     return jsonify({"jobs": out})
 
@@ -349,8 +352,21 @@ def _feed_job_row(db, j, user_skills):
     }
 
 
+_STATUS_CACHE = {"t": 0.0, "body": None}
+
+
 @bp.get("/feed/status")
 def feed_status():
+    import time
+    c = _STATUS_CACHE
+    if c["body"] is not None and time.time() - c["t"] < 60 and not current_app.config.get("TESTING"):
+        return current_app.response_class(c["body"], mimetype="application/json")
+    resp = _feed_status()
+    c["body"], c["t"] = resp.get_data(), time.time()
+    return resp
+
+
+def _feed_status():
     db = get_db()
     feed.maybe_refresh(current_app, db)
     jobs = db.execute("SELECT source, COUNT(*) AS c FROM live_jobs GROUP BY source").fetchall()

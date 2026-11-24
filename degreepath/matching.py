@@ -21,12 +21,14 @@ def _job_requirements(db, job_id):
     ).fetchall()
 
 
-def match_job(db, user_skills, job_id):
+def match_job(db, user_skills, job_id, reqs=None, smap=None):
     """Weighted coverage: sum(importance of matched) / sum(importance of all)."""
-    reqs = _job_requirements(db, job_id)
+    if reqs is None:
+        reqs = _job_requirements(db, job_id)
     if not reqs:
         return None
-    smap = _skill_map(db)
+    if smap is None:
+        smap = _skill_map(db)
     total = sum(r["importance"] for r in reqs)
     matched, missing = [], []
     got = 0
@@ -59,8 +61,12 @@ def rank_jobs(db, user_id):
         "SELECT id, title, title_ar, category, description FROM jobs"
     ).fetchall()
     results = []
+    smap = _skill_map(db)
+    reqs_by_job = {}
+    for r in db.execute("SELECT job_id, skill_id, importance FROM job_skills").fetchall():
+        reqs_by_job.setdefault(r["job_id"], []).append(r)
     for j in jobs:
-        m = match_job(db, user_skills, j["id"])
+        m = match_job(db, user_skills, j["id"], reqs_by_job.get(j["id"], []), smap)
         if m is None:
             continue
         m.update(
