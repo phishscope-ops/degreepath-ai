@@ -560,7 +560,7 @@ def feed_courses():
     total = _cached_rows(db, "SELECT COUNT(*) AS n FROM live_courses" + w, args)[0]["n"]
     rows = _cached_rows(db,
         "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses" + w
-        + " ORDER BY (source='coursera') DESC, id LIMIT ? OFFSET ?", args + [limit, offset])
+        + " ORDER BY id LIMIT ? OFFSET ?", args + [limit, offset])
     out = []
     for r in rows:
         info = feed.SOURCE_INFO.get(r["source"], {})
@@ -568,7 +568,7 @@ def feed_courses():
             "id": r["id"], "title": r["title"], "summary": r["summary"], "url": r["url"],
             "level": r["level"], "duration_min": r["duration_min"],
             "provider": info.get("name", r["source"]),
-            "free": "audit" if r["source"] == "coursera" else "free",
+            "free": "free",
             "field_label": feed.FIELD_LABELS.get(r["field"] or "other", ""),
         })
     return jsonify({"total": total, "courses": out})

@@ -192,7 +192,7 @@ python -m degreepath.train_model   # يكتب model.joblib + model_metrics.json
 ## وظائف اليوم وكورسات مجانية (v1.2)
 
 صفحة "وظائف اليوم" بتجمع وظائف من 5 مصادر عامة (Remotive, Arbeitnow, Remote OK,
-Jobicy, Himalayas) وكورسات من Microsoft Learn (مجاني) وCoursera (مجاني للمشاهدة).
+Jobicy, Himalayas) وكورسات من Microsoft Learn (مجاني) (كله مجاني).
 كل وظيفة وكورس بيتحللوا بنفس قاموس المهارات، فالمسار بيبقى: وظيفة ← المهارات الناقصة
 ← كورسات تسد الفجوة ← رابط التقديم الأصلي.
 

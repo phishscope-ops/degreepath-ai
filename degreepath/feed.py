@@ -2,7 +2,7 @@
 
 Sources (all public, no API key, no account, no payment):
   jobs:    Remotive, Arbeitnow, RemoteOK, Jobicy, Himalayas
-  courses: Microsoft Learn catalog (fully free), Coursera public catalog (free to audit)
+  courses: Microsoft Learn catalog (fully free), curated free resources
 
 Every job and course is run through the same skill dictionary used for the
 student's own subjects, so a job -> missing skills -> courses -> apply link chain
@@ -51,8 +51,6 @@ SOURCE_INFO = {
                   "note": "رابط التقديم يفتح Himalayas"},
     "mslearn": {"name": "Microsoft Learn", "kind": "course", "site": "https://learn.microsoft.com/training/",
                 "note": "مجاني بالكامل"},
-    "coursera": {"name": "Coursera", "kind": "course", "site": "https://www.coursera.org",
-                 "note": "مجاني للمشاهدة (Audit)؛ الشهادة مدفوعة"},
 }
 
 
@@ -242,26 +240,7 @@ def fetch_mslearn():
     return out
 
 
-def fetch_coursera(pages=25):
-    out = []
-    for i in range(pages):
-        d = _get("https://api.coursera.org/api/courses.v1",
-                 params={"start": i * 100, "limit": 100,
-                         "fields": "name,slug,description,primaryLanguages"})
-        els = d.get("elements", [])
-        for c in els:
-            if "en" not in (c.get("primaryLanguages") or ["en"]):
-                continue
-            out.append(dict(
-                ext_id=c["id"], title=c["name"], summary=clean(c.get("description"), 400),
-                url="https://www.coursera.org/learn/" + c["slug"], level="", duration_min=0,
-            ))
-        if len(els) < 100:
-            break
-    return out
-
-
-COURSE_FETCHERS = {"mslearn": fetch_mslearn, "coursera": fetch_coursera}
+COURSE_FETCHERS = {"mslearn": fetch_mslearn}
 
 
 # ------------------------------------------------------------------ refresh
@@ -421,6 +400,10 @@ def refresh(db_path, run_id=None):
             db.rollback()
             report["sources"][src] = {"ok": False, "error": str(e)[:200]}
 
+    # Coursera is only free for a trial period; keep it out of the app entirely.
+    db.execute("DELETE FROM live_courses WHERE source = 'coursera'")
+    db.commit()
+
     for src, fn in COURSE_FETCHERS.items():
         try:
             items = fn()
@@ -567,7 +550,7 @@ def courses_for_skill(db, skill_id, limit=3):
                 info = SOURCE_INFO.get(src, {})
                 picked.append({
                     "title": r["title"], "url": r["url"], "provider": info.get("name", src),
-                    "free": "audit" if src == "coursera" else "free",
+                    "free": "free",
                     "level": r["level"], "duration_min": r["duration_min"],
                 })
         i += 1

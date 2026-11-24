@@ -321,7 +321,7 @@ RESOURCES = [
     ("Python", "Python official tutorial", "https://docs.python.org/3/tutorial/", "docs"),
     ("Python", "freeCodeCamp Python (YouTube)", "https://www.youtube.com/watch?v=rfscVS0vtbw", "video"),
     ("Data Analysis", "Kaggle Learn: Data Analysis", "https://www.kaggle.com/learn", "course"),
-    ("Data Analysis", "Google Data Analytics (audit free on Coursera)", "https://www.coursera.org/professional-certificates/google-data-analytics", "course"),
+    ("Data Analysis", "freeCodeCamp: Data Analysis with Python (free)", "https://www.freecodecamp.org/learn/data-analysis-with-python/", "course"),
     ("Data Visualization", "Kaggle Learn: Data Visualization", "https://www.kaggle.com/learn/data-visualization", "course"),
     ("Power BI", "Microsoft Power BI learning path", "https://learn.microsoft.com/training/powerplatform/power-bi", "course"),
     ("Tableau", "Tableau free training videos", "https://www.tableau.com/learn/training", "video"),
@@ -330,7 +330,7 @@ RESOURCES = [
     ("NumPy", "NumPy quickstart", "https://numpy.org/doc/stable/user/quickstart.html", "docs"),
     ("Data Cleaning", "Kaggle Learn: Data Cleaning", "https://www.kaggle.com/learn/data-cleaning", "course"),
     ("Machine Learning", "Kaggle Learn: Intro to Machine Learning", "https://www.kaggle.com/learn/intro-to-machine-learning", "course"),
-    ("Machine Learning", "Andrew Ng ML Specialization (audit free)", "https://www.coursera.org/specializations/machine-learning-introduction", "course"),
+    ("Machine Learning", "Google Machine Learning Crash Course (free)", "https://developers.google.com/machine-learning/crash-course", "course"),
     ("Deep Learning", "fast.ai Practical Deep Learning", "https://course.fast.ai/", "course"),
     ("Scikit-learn", "scikit-learn user guide", "https://scikit-learn.org/stable/user_guide.html", "docs"),
     ("TensorFlow", "TensorFlow tutorials", "https://www.tensorflow.org/tutorials", "docs"),
@@ -368,10 +368,10 @@ RESOURCES = [
     ("Algorithms", "NeetCode practice", "https://neetcode.io/", "practice"),
     ("System Design", "System Design Primer (GitHub)", "https://github.com/donnemartin/system-design-primer", "docs"),
     ("Testing", "pytest documentation", "https://docs.pytest.org/", "docs"),
-    ("UI/UX Design", "Google UX Design (audit free on Coursera)", "https://www.coursera.org/professional-certificates/google-ux-design", "course"),
+    ("UI/UX Design", "web.dev Learn Design (free)", "https://web.dev/learn/design", "course"),
     ("UI/UX Design", "Figma free tutorials", "https://help.figma.com/hc/en-us/categories/360002051613", "video"),
     ("Communication", "Toastmasters resources", "https://www.toastmasters.org/resources", "docs"),
-    ("Project Management", "Google Project Management (audit free)", "https://www.coursera.org/professional-certificates/google-project-management", "course"),
+    ("Project Management", "Atlassian Project Management guide (free)", "https://www.atlassian.com/agile/project-management", "course"),
     ("Business Analysis", "IIBA free resources", "https://www.iiba.org/", "docs"),
     ("Digital Marketing", "Google Digital Garage (free)", "https://learndigital.withgoogle.com/", "course"),
     ("English", "BBC Learning English", "https://www.bbc.co.uk/learningenglish", "course"),
@@ -404,9 +404,9 @@ RESOURCES = [
     ("Generative AI", "DeepLearning.AI short courses (free)", "https://www.deeplearning.ai/short-courses/", "course"),
     ("Prompt Engineering", "ChatGPT Prompt Engineering for Developers (free)", "https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers/", "course"),
     ("Active Directory", "Active Directory on Microsoft Learn", "https://learn.microsoft.com/training/browse/?terms=active%20directory", "course"),
-    ("Technical Support", "Google IT Support (audit free on Coursera)", "https://www.coursera.org/professional-certificates/google-it-support", "course"),
+    ("Technical Support", "Professor Messer free CompTIA A+ videos", "https://www.professormesser.com/free-a-plus-training/", "video"),
     ("Unity", "Unity Learn (official free courses)", "https://learn.unity.com/", "course"),
-    ("Game Design", "Game Design and Development (audit free on Coursera)", "https://www.coursera.org/specializations/game-design-and-development", "course"),
+    ("Game Design", "Harvard CS50 Introduction to Game Development (free)", "https://cs50.harvard.edu/games/", "course"),
     ("Cisco (CCNA)", "Cisco Networking Academy (free courses)", "https://www.netacad.com/", "course"),
     ("Penetration Testing", "TryHackMe (free rooms)", "https://tryhackme.com/", "practice"),
     ("Penetration Testing", "HackTheBox Academy (free tier)", "https://academy.hackthebox.com/", "course"),
@@ -415,7 +415,7 @@ RESOURCES = [
     ("Bash", "GNU Bash manual", "https://www.gnu.org/software/bash/manual/", "docs"),
     ("Solidity", "CryptoZombies (learn Solidity by building)", "https://cryptozombies.io/", "course"),
     ("Solidity", "Solidity official docs", "https://docs.soliditylang.org/", "docs"),
-    ("Blockchain", "Blockchain Basics (audit free on Coursera)", "https://www.coursera.org/learn/blockchain-basics", "course"),
+    ("Blockchain", "Ethereum.org Learn Hub (free)", "https://ethereum.org/en/learn/", "course"),
     ("SwiftUI", "Apple SwiftUI tutorials (official)", "https://developer.apple.com/tutorials/swiftui", "docs"),
     ("Product Management", "Mind the Product (articles & guides)", "https://www.mindtheproduct.com/", "docs"),
     ("Agile/Scrum", "Atlassian Agile Coach", "https://www.atlassian.com/agile", "course"),
@@ -474,6 +474,9 @@ def seed_if_empty(db):
                 "INSERT INTO course_catalog (title, level, semester, description) VALUES (?, ?, ?, ?)",
                 (title, level, semester, desc),
             )
+
+    # Coursera is only free for a trial period; drop any old rows that point to it.
+    db.execute("DELETE FROM resources WHERE url LIKE '%coursera.org%'")
 
     for skill_name, title, url, kind in RESOURCES:
         sid = skill_id.get(skill_name)

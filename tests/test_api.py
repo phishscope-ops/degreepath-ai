@@ -195,7 +195,7 @@ def test_feed_egypt_filter_fields_and_courses(client):
         db = get_db()
         db.execute("INSERT INTO live_jobs (source, ext_id, title, company, url, country, field) VALUES ('workable','a','Accountant','X','https://e.com/a','EG','finance')")
         db.execute("INSERT INTO live_jobs (source, ext_id, title, company, url, country, field) VALUES ('arbeitnow','b','Dev','Y','https://e.com/b','','tech')")
-        db.execute("INSERT INTO live_courses (source, ext_id, title, url, field) VALUES ('coursera','c','Marketing 101','https://c.com/x','sales')")
+        db.execute("INSERT INTO live_courses (source, ext_id, title, url, field) VALUES ('mslearn','c','Marketing 101','https://c.com/x','sales')")
         db.commit()
     eg = client.get("/api/feed/jobs?country=eg", headers=h).get_json()
     assert [j["title"] for j in eg["jobs"]] == ["Accountant"] and eg["jobs"][0]["egypt"]
@@ -203,7 +203,7 @@ def test_feed_egypt_filter_fields_and_courses(client):
     st = client.get("/api/feed/status").get_json()
     assert st["egypt_jobs"] == 1 and st["job_fields"]
     cs = client.get("/api/feed/courses?field=sales", headers=h).get_json()
-    assert cs["total"] == 1 and cs["courses"][0]["free"] == "audit"
+    assert cs["total"] == 1 and cs["courses"][0]["free"] == "free"
 
 
 def test_feed_field_classifier():
@@ -269,3 +269,23 @@ def test_gzip_and_versioned_cache(client):
     assert "immutable" in r.headers["Cache-Control"]
     r = client.get("/", headers={"Accept-Encoding": "gzip"})
     assert r.headers["Cache-Control"] == "no-cache"
+
+
+def test_no_coursera_anywhere():
+    from degreepath import seed
+
+    assert not [r for r in seed.RESOURCES if "coursera" in r[2].lower()]
+    assert all(r[2].startswith("https://") for r in seed.RESOURCES)
+
+
+def test_old_coursera_rows_are_purged(client):
+    from degreepath import seed
+    from degreepath.db import get_db
+
+    with client.application.app_context():
+        db = get_db()
+        sid = db.execute("SELECT id FROM skills LIMIT 1").fetchone()["id"]
+        db.execute("INSERT INTO resources (skill_id, title, url, kind) VALUES (?, 'old', 'https://www.coursera.org/learn/x', 'course')", (sid,))
+        db.commit()
+        seed.seed_if_empty(db)
+        assert db.execute("SELECT COUNT(*) AS n FROM resources WHERE url LIKE '%coursera.org%'").fetchone()["n"] == 0
