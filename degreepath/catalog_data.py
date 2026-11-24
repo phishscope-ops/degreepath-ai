@@ -21,12 +21,15 @@ CATALOG = [
     ("مبادئ نظم المعلومات", 1, 2, "Principles of information systems: databases, data analysis, and business systems."),
     ("برمجة الحاسب (1)", 1, 2, "Computer programming 1: Python programming basics, data structures, and algorithms."),
     ("إحصاء واحتمالات", 1, 2, "Statistics and probability: statistical analysis and data analysis methods."),
+    ("تفاضل وتكامل", 1, 2, "Calculus: differentiation, integration, and mathematical problem solving."),
+    ("رياضيات بحتة", 1, 2, "Pure mathematics: mathematical foundations, logic, and problem solving."),
 
     # المستوى الثاني
     ("تحليل وتصميم نظم المعلومات", 2, 1, "Systems analysis and design: requirements gathering, database design, and system design."),
     ("مبادئ التسويق", 2, 1, "Principles of marketing: digital marketing and communication skills."),
     ("تطبيقات في الأمن السيبراني", 2, 1, "Cybersecurity applications: information security, network security, and penetration testing basics."),
     ("شبكات الحاسب (1)", 2, 1, "Computer networks 1: networking, TCP/IP, and network administration."),
+    ("محاسبة متوسطة", 2, 1, "Intermediate accounting: financial statements, Excel, and report writing."),
     ("تكنولوجيا الوسائط المتعددة", 2, 1, "Multimedia technology: image processing and digital media."),
     ("برمجة الحاسب (2)", 2, 1, "Computer programming 2: object oriented programming, data structures, and algorithms."),
     ("نظم معلومات الأعمال", 2, 2, "Business information systems: business analysis, databases, and reporting."),
@@ -54,6 +57,7 @@ CATALOG = [
     ("تطبيقات الموبايل", 4, 1, "Mobile applications: programming, REST APIs, and UI/UX design."),
     ("انترنت الأشياء", 4, 1, "Internet of Things: networking, embedded programming, and cloud computing."),
     ("مشروع التخرج", 4, 1, "Graduation project: project management, research, report writing, and presentation skills."),
+    ("نظم قواعد المعرفة", 4, 2, "Knowledge-based systems: knowledge representation, reasoning, and artificial intelligence."),
     ("البيانات الضخمة", 4, 2, "Big data: big data, Spark, data pipelines, and ETL."),
     ("تطبيقات الذكاء الاصطناعي", 4, 2, "AI applications: machine learning, deep learning, and Python."),
     ("الواقع الافتراضي", 4, 2, "Virtual reality: 3D programming and UI/UX design."),

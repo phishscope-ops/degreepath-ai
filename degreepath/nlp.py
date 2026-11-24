@@ -74,3 +74,34 @@ def extract_skills_named(text, db):
     rows = db.execute(q, ids).fetchall()
     by_id = {r["id"]: dict(r) for r in rows}
     return [by_id[i] for i in ids if i in by_id]
+
+
+def extract_skills_hybrid(text, db):
+    """Dictionary extraction + trained-model predictions, tagged by source.
+
+    Each skill dict gets a "source": "dictionary" (alias match),
+    "model" (classifier only), or "both". Model predictions include a
+    "confidence" probability. Runs fully offline.
+    """
+    from . import ml
+
+    found = extract_skills_named(text, db)
+    by_name = {s["name"]: s for s in found}
+    for s in found:
+        s["source"] = "dictionary"
+    for name, prob in ml.predict_skills(text):
+        if name in by_name:
+            by_name[name]["source"] = "both"
+            by_name[name]["confidence"] = round(prob, 3)
+        else:
+            row = db.execute(
+                "SELECT id, name, name_ar, category FROM skills WHERE name = ?", (name,)
+            ).fetchone()
+            if row is None:
+                continue
+            s = dict(row)
+            s["source"] = "model"
+            s["confidence"] = round(prob, 3)
+            found.append(s)
+            by_name[name] = s
+    return found

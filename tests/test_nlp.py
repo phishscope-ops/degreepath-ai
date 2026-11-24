@@ -69,3 +69,28 @@ def test_no_false_positive_on_unrelated_text(app):
         db = get_db()
         skills = nlp.extract_skills_named("I had lunch with my friend yesterday.", db)
         assert skills == []
+
+
+def test_trained_model_predictions():
+    """The trained classifier predicts skills offline and rejects negatives."""
+    from degreepath.ml import predict_skills, reset
+
+    reset()
+    preds = predict_skills("Students will learn react and docker deployment")
+    names = [p[0] for p in preds]
+    assert "Docker" in names
+    assert all(0.35 <= p <= 1.0 for _, p in preds)
+    assert predict_skills("I had lunch with my friend yesterday.") == []
+
+
+def test_hybrid_extraction_tags_sources(app):
+    with app.app_context():
+        from degreepath.db import get_db
+        from degreepath import nlp
+
+        skills = nlp.extract_skills_hybrid(
+            "كورس عملي في تحليل البيانات باستخدام بايثون", get_db()
+        )
+        assert skills
+        assert all("source" in s for s in skills)
+        assert any(s["source"] in ("dictionary", "both") for s in skills)

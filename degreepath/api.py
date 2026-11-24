@@ -140,7 +140,7 @@ def add_course():
         (g.user["id"], title, description, kind),
     )
     cid = cur.lastrowid
-    skills = nlp.extract_skills_named(f"{title}. {description}", db)
+    skills = nlp.extract_skills_hybrid(f"{title}. {description}", db)
     for s in skills:
         db.execute(
             "INSERT OR IGNORE INTO course_skills (course_id, skill_id) VALUES (?, ?)",
@@ -180,7 +180,7 @@ def add_from_catalog():
         (g.user["id"], row["title"], row["description"]),
     )
     cid = cur.lastrowid
-    skills = nlp.extract_skills_named(f"{row['title']}. {row['description']}", db)
+    skills = nlp.extract_skills_hybrid(f"{row['title']}. {row['description']}", db)
     for s in skills:
         db.execute(
             "INSERT OR IGNORE INTO course_skills (course_id, skill_id) VALUES (?, ?)",
@@ -228,7 +228,7 @@ def extract_preview():
     return jsonify(
         {
             "tokens": nlp.preprocess(text)[:60],
-            "skills": nlp.extract_skills_named(text, db),
+            "skills": nlp.extract_skills_hybrid(text, db),
         }
     )
 
