@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DegreePath AI - طريقك من الدراسة للوظيفة</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav id="navbar" class="hidden">
+  <div class="nav-brand">🎓 DegreePath AI</div>
+  <div class="nav-links">
+    <a href="#/dashboard" data-route="dashboard">لوحة التحكم</a>
+    <a href="#/courses" data-route="courses">موادي وكورساتي</a>
+    <a href="#/jobs" data-route="jobs">الوظائف</a>
+    <a href="#/profile" data-route="profile">ملفي الشخصي</a>
+    <a href="#" id="logoutBtn">خروج</a>
+  </div>
+  <div class="nav-user" id="navUser"></div>
+</nav>
+
+<main id="app"></main>
+
+<template id="tpl-auth">
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <h1>🎓 DegreePath AI</h1>
+      <p class="muted">اكتشف الوظائف المناسبة ليك، والمهارات الناقصة، وخطة تعلم توصل بيها لشغلانة أحلامك.</p>
+      <div class="tabs">
+        <button class="tab active" id="tabLogin">تسجيل الدخول</button>
+        <button class="tab" id="tabRegister">حساب جديد</button>
+      </div>
+      <form id="loginForm">
+        <label>البريد الإلكتروني<input type="email" name="email" required></label>
+        <label>كلمة المرور<input type="password" name="password" required></label>
+        <button class="btn primary" type="submit">دخول</button>
+      </form>
+      <form id="registerForm" class="hidden">
+        <label>الاسم<input type="text" name="name" required></label>
+        <label>البريد الإلكتروني<input type="email" name="email" required></label>
+        <label>كلمة المرور (6 أحرف على الأقل)<input type="password" name="password" minlength="6" required></label>
+        <button class="btn primary" type="submit">إنشاء الحساب</button>
+      </form>
+      <p class="error" id="authError"></p>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-dashboard">
+  <div class="page">
+    <h2>لوحة التحكم</h2>
+    <div id="dashSummary"></div>
+    <h3>الوظائف المقترحة ليك</h3>
+    <div id="dashMatches" class="grid"></div>
+  </div>
+</template>
+
+<template id="tpl-courses">
+  <div class="page">
+    <h2>موادي وكورساتي</h2>
+    <div class="card">
+      <h3>إضافة من قائمة مقررات القسم</h3>
+      <p class="muted">قائمة مقررات قسم إدارة نظم المعلومات وتكنولوجياها (لائحة 2023/2024). اختر المادة وهتتضاف بمهاراتها على طول.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="catalogSelect" style="flex:1"></select>
+        <button class="btn primary" id="catalogAddBtn">إضافة</button>
+      </div>
+      <p class="error" id="catalogError"></p>
+    </div>
+    <div class="card">
+      <h3>إضافة مادة أو كورس يدويًا</h3>
+      <p class="muted">اكتب اسم المادة ووصفها، والنظام هيستخرج المهارات تلقائيًا من الوصف.</p>
+      <form id="courseForm">
+        <label>اسم المادة / الكورس<input type="text" name="title" required placeholder="مثال: Python Programming and Statistical Analysis"></label>
+        <label>الوصف<textarea name="description" rows="3" placeholder="مثال: This course covers Python programming, statistics, data cleaning and data visualization with pandas."></textarea></label>
+        <label>النوع
+          <select name="kind"><option value="course">مادة دراسية</option><option value="certification">كورس / شهادة</option></select>
+        </label>
+        <button class="btn primary" type="submit">إضافة وتحليل</button>
+      </form>
+      <div id="courseResult"></div>
+    </div>
+    <h3>المهارات المستخرجة من كل موادك</h3>
+    <div id="allSkills" class="chips"></div>
+    <h3>المواد المسجلة</h3>
+    <div id="courseList"></div>
+  </div>
+</template>
+
+<template id="tpl-jobs">
+  <div class="page">
+    <h2>الوظائف المتاحة في النظام</h2>
+    <div id="jobsList" class="grid"></div>
+  </div>
+</template>
+
+<template id="tpl-job-detail">
+  <div class="page">
+    <a href="#/jobs" class="back-link">→ رجوع للوظائف</a>
+    <div id="jobDetail"></div>
+  </div>
+</template>
+
+<template id="tpl-profile">
+  <div class="page">
+    <h2>ملفي الشخصي</h2>
+    <div class="card">
+      <form id="profileForm">
+        <label>الجامعة<input type="text" name="university"></label>
+        <label>الكلية / التخصص<input type="text" name="major"></label>
+        <label>السنة الدراسية
+          <select name="study_year">
+            <option value="">اختر...</option>
+            <option>الأولى</option><option>الثانية</option>
+            <option>الثالثة</option><option>الرابعة</option><option>خريج</option>
+          </select>
+        </label>
+        <label>الوظيفة المستهدفة<select name="target_job_id" id="targetJobSelect"><option value="">اختر وظيفة...</option></select></label>
+        <button class="btn primary" type="submit">حفظ</button>
+      </form>
+      <p class="success" id="profileMsg"></p>
+    </div>
+  </div>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>

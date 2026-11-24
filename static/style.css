@@ -1,0 +1,140 @@
+:root {
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --bg: #f3f4f8;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.hidden { display: none !important; }
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--card);
+  padding: 12px 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-brand { font-weight: 700; font-size: 1.1rem; color: var(--primary); }
+.nav-links { display: flex; gap: 16px; flex: 1; }
+.nav-links a { color: var(--text); text-decoration: none; padding: 4px 8px; border-radius: 8px; }
+.nav-links a:hover, .nav-links a.active { background: #eef0fd; color: var(--primary); }
+.nav-user { color: var(--muted); font-size: .9rem; }
+
+.page { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+
+h2 { margin-bottom: 4px; }
+h3 { margin-top: 28px; }
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 12px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.auth-wrap { display: flex; justify-content: center; padding: 48px 16px; }
+.auth-card { max-width: 420px; width: 100%; }
+.auth-card h1 { text-align: center; color: var(--primary); }
+
+.tabs { display: flex; gap: 8px; margin: 16px 0; }
+.tab {
+  flex: 1; padding: 8px; border: 1px solid #e5e7eb; background: #f9fafb;
+  border-radius: 8px; cursor: pointer; font-size: .95rem;
+}
+.tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+label { display: block; margin: 12px 0; font-size: .92rem; }
+input, textarea, select {
+  width: 100%; margin-top: 4px; padding: 10px;
+  border: 1px solid #d1d5db; border-radius: 8px; font-size: .95rem;
+  font-family: inherit;
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+
+.btn {
+  padding: 10px 20px; border-radius: 8px; border: none;
+  cursor: pointer; font-size: .95rem;
+}
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.primary:hover { background: var(--primary-dark); }
+.btn.small { padding: 6px 12px; font-size: .85rem; }
+.btn.danger { background: #fee2e2; color: var(--red); }
+
+.error { color: var(--red); font-size: .9rem; }
+.success { color: var(--green); font-size: .9rem; }
+.muted { color: var(--muted); font-size: .92rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.job-card { cursor: pointer; transition: transform .1s; }
+.job-card:hover { transform: translateY(-2px); }
+.job-card h4 { margin: 0 0 6px; }
+.job-card .cat { color: var(--muted); font-size: .8rem; }
+
+.match-bar {
+  height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin: 10px 0 4px;
+}
+.match-bar > div { height: 100%; background: var(--primary); border-radius: 5px; }
+.match-bar.high > div { background: var(--green); }
+.match-bar.mid > div { background: var(--amber); }
+
+.match-pct { font-weight: 700; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.chip {
+  background: #eef0fd; color: var(--primary-dark);
+  padding: 4px 12px; border-radius: 999px; font-size: .85rem;
+}
+.chip.have { background: #dcfce7; color: #166534; }
+.chip.missing { background: #fee2e2; color: #991b1b; }
+.chip.core { border: 1px solid currentColor; font-weight: 600; }
+
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
+.summary-card { background: var(--card); border-radius: var(--radius); padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.summary-card .num { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+.summary-card .lbl { color: var(--muted); font-size: .85rem; }
+
+.roadmap { counter-reset: step; }
+.roadmap-step {
+  background: var(--card); border-radius: var(--radius); padding: 16px;
+  margin: 10px 0; border-right: 4px solid var(--primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.roadmap-step .step-title { font-weight: 700; }
+.roadmap-step ul { margin: 8px 0 0; padding-right: 20px; }
+.roadmap-step a { color: var(--primary); }
+
+.back-link { color: var(--primary); text-decoration: none; }
+
+.course-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.course-item h4 { margin: 0 0 4px; }
+
+.badge { display: inline-block; background: #f3f4f6; border-radius: 6px; padding: 2px 8px; font-size: .75rem; color: var(--muted); }
+
+.empty-state { text-align: center; color: var(--muted); padding: 32px; }
