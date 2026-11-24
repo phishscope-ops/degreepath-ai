@@ -358,30 +358,30 @@ RESOURCES = [
     ("Database Administration", "PostgreSQL DBA docs", "https://www.postgresql.org/docs/current/admin.html", "docs"),
     ("ETL", "Kaggle Learn: Data Cleaning + pipelines", "https://www.kaggle.com/learn", "course"),
     ("Big Data", "Spark documentation", "https://spark.apache.org/docs/latest/", "docs"),
-    ("AWS", "AWS Skill Builder (free tier)", "https://skillbuilder.aws/", "course"),
+    ("AWS", "AWS documentation and tutorials (free)", "https://docs.aws.amazon.com/", "docs"),
     ("Azure", "Microsoft Learn Azure fundamentals", "https://learn.microsoft.com/training/azure/", "course"),
-    ("Cloud Computing", "Google Cloud skills boost (free courses)", "https://www.cloudskillsboost.google/", "course"),
+    ("Cloud Computing", "Azure fundamentals on Microsoft Learn (free)", "https://learn.microsoft.com/training/azure/", "course"),
     ("Networking", "Cisco Networking Academy (free courses)", "https://www.netacad.com/", "course"),
-    ("Cybersecurity", "TryHackMe (free rooms)", "https://tryhackme.com/", "practice"),
-    ("OOP", "Python OOP (Real Python)", "https://realpython.com/python3-object-oriented-programming/", "docs"),
+    ("Cybersecurity", "OverTheWire wargames (free)", "https://overthewire.org/wargames/", "practice"),
+    ("OOP", "Python tutorial: Classes (official, free)", "https://docs.python.org/3/tutorial/classes.html", "docs"),
     ("Data Structures", "freeCodeCamp Data Structures (YouTube)", "https://www.youtube.com/watch?v=RBSGKlAvoiM", "video"),
-    ("Algorithms", "NeetCode practice", "https://neetcode.io/", "practice"),
+    ("Algorithms", "Princeton Algorithms, 4th ed. (free book and code)", "https://algs4.cs.princeton.edu/home/", "docs"),
     ("System Design", "System Design Primer (GitHub)", "https://github.com/donnemartin/system-design-primer", "docs"),
     ("Testing", "pytest documentation", "https://docs.pytest.org/", "docs"),
     ("UI/UX Design", "web.dev Learn Design (free)", "https://web.dev/learn/design", "course"),
     ("UI/UX Design", "Figma free tutorials", "https://help.figma.com/hc/en-us/categories/360002051613", "video"),
-    ("Communication", "Toastmasters resources", "https://www.toastmasters.org/resources", "docs"),
+    ("Communication", "MIT OpenCourseWare (free course materials)", "https://ocw.mit.edu/", "course"),
     ("Project Management", "Atlassian Project Management guide (free)", "https://www.atlassian.com/agile/project-management", "course"),
-    ("Business Analysis", "IIBA free resources", "https://www.iiba.org/", "docs"),
+    ("Business Analysis", "Atlassian: user stories and requirements (free)", "https://www.atlassian.com/agile/project-management/user-stories", "docs"),
     ("Digital Marketing", "Google Digital Garage (free)", "https://learndigital.withgoogle.com/", "course"),
     ("English", "BBC Learning English", "https://www.bbc.co.uk/learningenglish", "course"),
     ("Research", "Google Scholar", "https://scholar.google.com/", "practice"),
     ("Report Writing", "Purdue OWL writing lab", "https://owl.purdue.edu/", "docs"),
     ("Teamwork", "Atlassian teamwork guides", "https://www.atlassian.com/agile/teams", "docs"),
-    ("Problem Solving", "LeetCode (free problems)", "https://leetcode.com/", "practice"),
+    ("Problem Solving", "Exercism coding practice (100% free)", "https://exercism.org/", "practice"),
     ("C++", "learncpp.com", "https://www.learncpp.com/", "course"),
     ("C#", "Microsoft Learn C#", "https://learn.microsoft.com/dotnet/csharp/", "course"),
-    ("Java", "Hyperskill Java (free track)", "https://hyperskill.org/", "course"),
+    ("Java", "MOOC.fi Java Programming (free university course)", "https://java-programming.mooc.fi/", "course"),
     ("PHP", "PHP official manual", "https://www.php.net/manual/en/", "docs"),
     ("R", "R for Data Science (free book)", "https://r4ds.hadley.nz/", "course"),
     ("Flutter", "Flutter official docs + codelabs", "https://docs.flutter.dev/get-started", "docs"),
@@ -396,7 +396,7 @@ RESOURCES = [
     ("Terraform", "HashiCorp Terraform tutorials", "https://developer.hashicorp.com/terraform/tutorials", "course"),
     ("SEO", "Google Search Central docs", "https://developers.google.com/search/docs", "docs"),
     ("SEO", "Ahrefs Academy (free courses)", "https://ahrefs.com/academy", "course"),
-    ("Social Media Marketing", "Meta Blueprint (free lessons)", "https://www.facebook.com/business/learn", "course"),
+    ("Social Media Marketing", "HubSpot Academy: Social Media course (free)", "https://academy.hubspot.com/courses/social-media", "course"),
     ("Content Marketing", "HubSpot Academy (free certifications)", "https://academy.hubspot.com/", "course"),
     ("Google Analytics", "Google Skillshop - Analytics", "https://skillshop.docebosaas.com/", "course"),
     ("ERP", "Odoo eLearning (free)", "https://www.odoo.com/slides", "course"),
@@ -408,8 +408,8 @@ RESOURCES = [
     ("Unity", "Unity Learn (official free courses)", "https://learn.unity.com/", "course"),
     ("Game Design", "Harvard CS50 Introduction to Game Development (free)", "https://cs50.harvard.edu/games/", "course"),
     ("Cisco (CCNA)", "Cisco Networking Academy (free courses)", "https://www.netacad.com/", "course"),
-    ("Penetration Testing", "TryHackMe (free rooms)", "https://tryhackme.com/", "practice"),
-    ("Penetration Testing", "HackTheBox Academy (free tier)", "https://academy.hackthebox.com/", "course"),
+    ("Penetration Testing", "OverTheWire wargames (free)", "https://overthewire.org/wargames/", "practice"),
+    ("Penetration Testing", "PortSwigger Web Security Academy (free)", "https://portswigger.net/web-security", "course"),
     ("Windows Server", "Windows Server on Microsoft Learn", "https://learn.microsoft.com/training/browse/?terms=windows%20server", "course"),
     ("Bash", "Learn Shell (interactive, free)", "https://www.learnshell.org/", "practice"),
     ("Bash", "GNU Bash manual", "https://www.gnu.org/software/bash/manual/", "docs"),
@@ -417,15 +417,35 @@ RESOURCES = [
     ("Solidity", "Solidity official docs", "https://docs.soliditylang.org/", "docs"),
     ("Blockchain", "Ethereum.org Learn Hub (free)", "https://ethereum.org/en/learn/", "course"),
     ("SwiftUI", "Apple SwiftUI tutorials (official)", "https://developer.apple.com/tutorials/swiftui", "docs"),
-    ("Product Management", "Mind the Product (articles & guides)", "https://www.mindtheproduct.com/", "docs"),
+    ("Product Management", "Atlassian product management guide (free)", "https://www.atlassian.com/agile/product-management", "docs"),
     ("Agile/Scrum", "Atlassian Agile Coach", "https://www.atlassian.com/agile", "course"),
     ("Agile/Scrum", "The Scrum Guide (official)", "https://scrumguides.org/", "docs"),
     ("Graphic Design", "Canva Design School (free)", "https://www.canva.com/designschool/", "course"),
-    ("Adobe Photoshop", "Adobe Photoshop tutorials (official)", "https://helpx.adobe.com/photoshop/tutorials.html", "video"),
-    ("Adobe Illustrator", "Adobe Illustrator tutorials (official)", "https://helpx.adobe.com/illustrator/tutorials.html", "video"),
+    ("Adobe Photoshop", "GIMP tutorials (free software, free tutorials)", "https://www.gimp.org/tutorials/", "docs"),
+    ("Adobe Illustrator", "Inkscape tutorials (free software, free tutorials)", "https://inkscape.org/learn/tutorials/", "docs"),
     ("Video Editing", "DaVinci Resolve free training", "https://www.blackmagicdesign.com/products/davinciresolve/training", "course"),
-    ("Motion Graphics", "After Effects tutorials (official)", "https://helpx.adobe.com/after-effects/tutorials.html", "video"),
+    ("Motion Graphics", "Blender manual (free software, free docs)", "https://docs.blender.org/manual/en/latest/", "docs"),
     ("Technical Writing", "Google Technical Writing Courses (free)", "https://developers.google.com/tech-writing", "course"),
+]
+
+
+# Links that have a paid tier or need a paywall/membership to finish; removed from existing databases.
+PAID_URLS = [
+    "https://realpython.com/python3-object-oriented-programming/",
+    "https://neetcode.io/",
+    "https://leetcode.com/",
+    "https://hyperskill.org/",
+    "https://tryhackme.com/",
+    "https://academy.hackthebox.com/",
+    "https://skillbuilder.aws/",
+    "https://www.cloudskillsboost.google/",
+    "https://www.toastmasters.org/resources",
+    "https://www.iiba.org/",
+    "https://www.mindtheproduct.com/",
+    "https://www.facebook.com/business/learn",
+    "https://helpx.adobe.com/photoshop/tutorials.html",
+    "https://helpx.adobe.com/illustrator/tutorials.html",
+    "https://helpx.adobe.com/after-effects/tutorials.html",
 ]
 
 
@@ -477,6 +497,8 @@ def seed_if_empty(db):
 
     # Coursera is only free for a trial period; drop any old rows that point to it.
     db.execute("DELETE FROM resources WHERE url LIKE '%coursera.org%'")
+    for u in PAID_URLS:
+        db.execute("DELETE FROM resources WHERE url = ?", (u,))
 
     for skill_name, title, url, kind in RESOURCES:
         sid = skill_id.get(skill_name)

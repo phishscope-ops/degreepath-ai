@@ -289,3 +289,12 @@ def test_old_coursera_rows_are_purged(client):
         db.commit()
         seed.seed_if_empty(db)
         assert db.execute("SELECT COUNT(*) AS n FROM resources WHERE url LIKE '%coursera.org%'").fetchone()["n"] == 0
+
+
+def test_no_paid_tier_resources():
+    from degreepath import seed
+
+    urls = {r[2] for r in seed.RESOURCES}
+    assert not urls & set(seed.PAID_URLS)
+    for bad in ("tryhackme", "hackthebox", "leetcode", "neetcode", "hyperskill", "realpython"):
+        assert not any(bad in u for u in urls)
