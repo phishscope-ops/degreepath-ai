@@ -327,8 +327,20 @@ def analysis(job_id):
 
 # ---------------------------------------------------------------- live feed
 
-def _feed_job_row(db, j, user_skills):
-    reqs = db.execute(
+def _feed_reqs_map(db):
+    m = {}
+    for r in db.execute(
+        """SELECT js.job_id AS job_id, s.id AS id, s.name AS name, s.name_ar AS name_ar, js.importance AS importance
+           FROM live_job_skills js JOIN skills s ON s.id = js.skill_id
+           ORDER BY js.importance DESC, s.name"""
+    ).fetchall():
+        m.setdefault(r["job_id"], []).append(
+            {"id": r["id"], "name": r["name"], "name_ar": r["name_ar"], "importance": r["importance"]})
+    return m
+
+
+def _feed_job_row(db, j, user_skills, reqs_map=None):
+    reqs = reqs_map.get(j["id"], []) if reqs_map is not None else db.execute(
         """SELECT s.id, s.name, s.name_ar, js.importance FROM live_job_skills js
            JOIN skills s ON s.id = js.skill_id WHERE js.job_id = ?
            ORDER BY js.importance DESC, s.name""",
@@ -437,7 +449,8 @@ def feed_jobs():
         where.append("COALESCE(country,'') <> 'EG'")
     if where:
         sql += " WHERE " + " AND ".join(where)
-    rows = [_feed_job_row(db, j, user_skills) for j in db.execute(sql, args).fetchall()]
+    reqs_map = _feed_reqs_map(db)
+    rows = [_feed_job_row(db, j, user_skills, reqs_map) for j in db.execute(sql, args).fetchall()]
     if sort == "new":
         rows.sort(key=lambda r: r["posted_at"] or "", reverse=True)
     else:

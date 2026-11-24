@@ -7,6 +7,7 @@ translates the small dialect differences.
 """
 import re
 import sqlite3
+import threading
 
 from flask import current_app, g
 
@@ -303,13 +304,37 @@ def connect_dsn(dsn):
     return db
 
 
+_local = threading.local()
+
+
+def _reuse_pg(dsn):
+    """Reuse one Postgres connection per thread (a fresh TLS connect to Neon costs
+    over a second). A cheap ping detects connections Neon dropped while idle."""
+    c = getattr(_local, "conn", None)
+    if c is not None:
+        try:
+            c._raw.rollback()
+            c.execute("SELECT 1")
+            c._raw.rollback()
+            return c
+        except Exception:
+            try:
+                c.close()
+            except Exception:
+                pass
+            _local.conn = None
+    c = connect_dsn(dsn)
+    _local.conn = c
+    return c
+
+
 def get_db():
     """One connection per request. On Postgres a fresh connect per request is
     deliberate: Neon scales to zero when idle, which drops pooled connections."""
     if "db" not in g:
         dsn = current_app.config["DATABASE"]
         if is_pg_dsn(dsn):
-            g.db = connect_dsn(dsn)
+            g.db = _reuse_pg(dsn)
         else:
             g.db = sqlite3.connect(dsn, timeout=60)
             g.db.row_factory = sqlite3.Row
@@ -326,7 +351,12 @@ def close_db(_exc=None):
         try:
             db.rollback()
         except Exception:
-            pass
+            _local.conn = None
+            try:
+                db.close()
+            except Exception:
+                pass
+        return
     db.close()
 
 
