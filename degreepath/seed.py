@@ -106,6 +106,112 @@ JOBS = [
     ),
 ]
 
+
+NEW_JOBS = [
+    (
+        "Full-Stack Developer", "مطور فول ستاك", "web",
+        "Build complete web applications end to end: responsive frontends, "
+        "REST APIs and database layers, shipped with Git and Docker.",
+        [
+            ("HTML/CSS", 3), ("JavaScript", 3), ("REST APIs", 3), ("React", 2),
+            ("Node.js", 2), ("SQL", 2), ("Git", 2), ("Testing", 2),
+            ("TypeScript", 1), ("Docker", 1), ("UI/UX Design", 1),
+        ],
+    ),
+    (
+        "Mobile App Developer (Flutter)", "مطور تطبيقات موبايل", "mobile",
+        "Design and ship Android and iOS apps from one codebase with Flutter "
+        "and Dart. Work with REST APIs, Firebase and clean app architecture.",
+        [
+            ("Mobile Development", 3), ("Flutter", 3), ("Dart", 2), ("Firebase", 2),
+            ("REST APIs", 2), ("OOP", 2), ("Git", 2), ("UI/UX Design", 1),
+            ("Testing", 1), ("Problem Solving", 1),
+        ],
+    ),
+    (
+        "Cybersecurity Analyst", "محلل أمن سيبراني", "security",
+        "Monitor systems for threats, investigate incidents and test defenses. "
+        "Strong networking, Linux and security fundamentals with clear reporting.",
+        [
+            ("Cybersecurity", 3), ("Networking", 3), ("Linux", 2), ("Python", 2),
+            ("Problem Solving", 2), ("English", 2), ("Report Writing", 1),
+            ("Testing", 1),
+        ],
+    ),
+    (
+        "Data Engineer", "مهندس بيانات", "data",
+        "Build and maintain data pipelines and warehouses so analysts and ML "
+        "models get clean, reliable data. Strong SQL, Python and ETL on cloud.",
+        [
+            ("SQL", 3), ("Python", 3), ("ETL", 3), ("Data Warehousing", 2),
+            ("Big Data", 2), ("Database Design", 2), ("Data Cleaning", 2),
+            ("Cloud Computing", 2), ("Docker", 1), ("Git", 1),
+        ],
+    ),
+    (
+        "Cloud Engineer", "مهندس حوسبة سحابية", "cloud",
+        "Design and run infrastructure on AWS/Azure, automate deployments with "
+        "Terraform and containers, and keep systems reliable and cost-efficient.",
+        [
+            ("Cloud Computing", 3), ("AWS", 2), ("Azure", 2), ("Linux", 2),
+            ("Docker", 2), ("Kubernetes", 2), ("Terraform", 2), ("Networking", 2),
+            ("Git", 1), ("Problem Solving", 1),
+        ],
+    ),
+    (
+        "QA / Test Automation Engineer", "مهندس ضمان جودة", "software",
+        "Own product quality: design test plans, automate regression suites "
+        "with Selenium/Cypress and track bugs so releases ship with confidence.",
+        [
+            ("Testing", 3), ("Test Automation", 3), ("Problem Solving", 2),
+            ("Git", 2), ("Communication", 2), ("Python", 1), ("SQL", 1),
+            ("REST APIs", 1), ("Report Writing", 1),
+        ],
+    ),
+    (
+        "Digital Marketing Specialist", "أخصائي تسويق رقمي", "business",
+        "Plan and run online campaigns across search and social, measure "
+        "results with analytics and turn data into growth decisions.",
+        [
+            ("Digital Marketing", 3), ("Social Media Marketing", 3), ("SEO", 2),
+            ("Content Marketing", 2), ("Google Analytics", 2), ("Communication", 2),
+            ("English", 2), ("Data Analysis", 1), ("Report Writing", 1),
+        ],
+    ),
+    (
+        "AI Engineer", "مهندس ذكاء اصطناعي", "ai",
+        "Build products on top of large language models and ML: prompts, "
+        "evaluation, fine-tuning and integration into real applications.",
+        [
+            ("Generative AI", 3), ("Machine Learning", 3), ("Python", 3),
+            ("Prompt Engineering", 2), ("NLP", 2), ("Deep Learning", 2),
+            ("REST APIs", 1), ("Data Analysis", 1), ("Git", 1),
+        ],
+    ),
+    (
+        "ERP Developer (Odoo)", "مطور أنظمة ERP", "software",
+        "Customize and develop ERP modules (Odoo/SAP) around business processes: "
+        "accounting, inventory, HR. Python, PostgreSQL and business understanding.",
+        [
+            ("ERP", 3), ("Odoo", 3), ("Python", 2), ("PostgreSQL", 2), ("SQL", 2),
+            ("Business Analysis", 1), ("Database Design", 1), ("Git", 1),
+            ("Communication", 1),
+        ],
+    ),
+    (
+        "IT Support Engineer", "مهندس دعم فني", "it",
+        "Keep people and systems running: troubleshoot hardware, software and "
+        "network issues, and manage users and access on Windows environments.",
+        [
+            ("Technical Support", 3), ("Problem Solving", 3), ("Networking", 2),
+            ("Active Directory", 2), ("Communication", 2), ("English", 1),
+            ("Linux", 1), ("Cybersecurity", 1),
+        ],
+    ),
+]
+
+JOBS = JOBS + NEW_JOBS
+
 # Free learning resources per skill: (skill name, title, url, kind)
 RESOURCES = [
     ("SQL", "SQLBolt - Interactive SQL lessons", "https://sqlbolt.com/", "course"),
@@ -178,20 +284,44 @@ RESOURCES = [
     ("Java", "Hyperskill Java (free track)", "https://hyperskill.org/", "course"),
     ("PHP", "PHP official manual", "https://www.php.net/manual/en/", "docs"),
     ("R", "R for Data Science (free book)", "https://r4ds.hadley.nz/", "course"),
+    ("Flutter", "Flutter official docs + codelabs", "https://docs.flutter.dev/get-started", "docs"),
+    ("Dart", "Dart language tour", "https://dart.dev/language", "docs"),
+    ("Kotlin", "Kotlin official docs", "https://kotlinlang.org/docs/home.html", "docs"),
+    ("Mobile Development", "Android Basics with Compose (Google, free)", "https://developer.android.com/courses", "course"),
+    ("Firebase", "Firebase documentation", "https://firebase.google.com/docs", "docs"),
+    ("Test Automation", "Test Automation University (free)", "https://testautomationu.applitools.com/", "course"),
+    ("Test Automation", "Selenium documentation", "https://www.selenium.dev/documentation/", "docs"),
+    ("Data Warehousing", "Data engineering path (Microsoft Learn)", "https://learn.microsoft.com/training/browse/?terms=data%20engineer", "course"),
+    ("Kubernetes", "Kubernetes official tutorials", "https://kubernetes.io/docs/tutorials/", "docs"),
+    ("Terraform", "HashiCorp Terraform tutorials", "https://developer.hashicorp.com/terraform/tutorials", "course"),
+    ("SEO", "Google Search Central docs", "https://developers.google.com/search/docs", "docs"),
+    ("SEO", "Ahrefs Academy (free courses)", "https://ahrefs.com/academy", "course"),
+    ("Social Media Marketing", "Meta Blueprint (free lessons)", "https://www.facebook.com/business/learn", "course"),
+    ("Content Marketing", "HubSpot Academy (free certifications)", "https://academy.hubspot.com/", "course"),
+    ("Google Analytics", "Google Skillshop - Analytics", "https://skillshop.docebosaas.com/", "course"),
+    ("ERP", "Odoo eLearning (free)", "https://www.odoo.com/slides", "course"),
+    ("Odoo", "Odoo documentation", "https://www.odoo.com/documentation", "docs"),
+    ("Generative AI", "DeepLearning.AI short courses (free)", "https://www.deeplearning.ai/short-courses/", "course"),
+    ("Prompt Engineering", "ChatGPT Prompt Engineering for Developers (free)", "https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers/", "course"),
+    ("Active Directory", "Active Directory on Microsoft Learn", "https://learn.microsoft.com/training/browse/?terms=active%20directory", "course"),
+    ("Technical Support", "Google IT Support (audit free on Coursera)", "https://www.coursera.org/professional-certificates/google-it-support", "course"),
 ]
 
 
 def seed_if_empty(db):
-    if db.execute("SELECT COUNT(*) AS c FROM skills").fetchone()["c"]:
-        return
+    """Ensure the taxonomy, jobs, catalog and resources exist.
 
+    Idempotent: safe to run at every startup. Existing databases pick up new
+    jobs/skills/resources added in later versions without a wipe, so the seed
+    keeps working if the app moves to a persistent external database.
+    """
     skill_id = {}
     for name, name_ar, category, aliases in SKILLS:
-        cur = db.execute(
-            "INSERT INTO skills (name, name_ar, category) VALUES (?, ?, ?)",
+        db.execute(
+            "INSERT OR IGNORE INTO skills (name, name_ar, category) VALUES (?, ?, ?)",
             (name, name_ar, category),
         )
-        sid = cur.lastrowid
+        sid = db.execute("SELECT id FROM skills WHERE name = ?", (name,)).fetchone()["id"]
         skill_id[name] = sid
         for alias in set(aliases + [name]):
             db.execute(
@@ -200,28 +330,38 @@ def seed_if_empty(db):
             )
 
     for title, title_ar, category, desc, reqs in JOBS:
-        cur = db.execute(
-            "INSERT INTO jobs (title, title_ar, category, description) VALUES (?, ?, ?, ?)",
-            (title, title_ar, category, desc),
-        )
-        jid = cur.lastrowid
+        row = db.execute("SELECT id FROM jobs WHERE title = ?", (title,)).fetchone()
+        if row:
+            jid = row["id"]
+        else:
+            cur = db.execute(
+                "INSERT INTO jobs (title, title_ar, category, description) VALUES (?, ?, ?, ?)",
+                (title, title_ar, category, desc),
+            )
+            jid = cur.lastrowid
         for skill_name, importance in reqs:
             db.execute(
-                "INSERT INTO job_skills (job_id, skill_id, importance) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO job_skills (job_id, skill_id, importance) VALUES (?, ?, ?)",
                 (jid, skill_id[skill_name], importance),
             )
 
     from .catalog_data import CATALOG
 
-    for title, level, semester, desc in CATALOG:
-        db.execute(
-            "INSERT INTO course_catalog (title, level, semester, description) VALUES (?, ?, ?, ?)",
-            (title, level, semester, desc),
-        )
+    if not db.execute("SELECT COUNT(*) AS c FROM course_catalog").fetchone()["c"]:
+        for title, level, semester, desc in CATALOG:
+            db.execute(
+                "INSERT INTO course_catalog (title, level, semester, description) VALUES (?, ?, ?, ?)",
+                (title, level, semester, desc),
+            )
 
     for skill_name, title, url, kind in RESOURCES:
         sid = skill_id.get(skill_name)
-        if sid:
+        if not sid:
+            continue
+        exists = db.execute(
+            "SELECT 1 FROM resources WHERE skill_id = ? AND url = ?", (sid, url)
+        ).fetchone()
+        if not exists:
             db.execute(
                 "INSERT INTO resources (skill_id, title, url, kind) VALUES (?, ?, ?, ?)",
                 (sid, title, url, kind),
