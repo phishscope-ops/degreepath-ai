@@ -127,15 +127,20 @@ def list_courses():
     courses = db.execute(
         "SELECT * FROM courses WHERE user_id = ? ORDER BY id DESC", (g.user["id"],)
     ).fetchall()
+    by_course = {}
+    for r in db.execute(
+        """SELECT cs.course_id AS course_id, s.id AS id, s.name AS name, s.name_ar AS name_ar,
+                  s.category AS category FROM course_skills cs
+           JOIN skills s ON s.id = cs.skill_id JOIN courses c ON c.id = cs.course_id
+           WHERE c.user_id = ?""",
+        (g.user["id"],),
+    ).fetchall():
+        by_course.setdefault(r["course_id"], []).append(
+            {"id": r["id"], "name": r["name"], "name_ar": r["name_ar"], "category": r["category"]})
     out = []
     for c in courses:
-        skills = db.execute(
-            """SELECT s.id, s.name, s.name_ar, s.category FROM course_skills cs
-               JOIN skills s ON s.id = cs.skill_id WHERE cs.course_id = ?""",
-            (c["id"],),
-        ).fetchall()
         d = dict(c)
-        d["skills"] = [dict(s) for s in skills]
+        d["skills"] = by_course.get(c["id"], [])
         out.append(d)
     return jsonify({"courses": out})
 
@@ -169,9 +174,8 @@ def add_course():
 @login_required
 def catalog():
     db = get_db()
-    rows = db.execute(
-        "SELECT id, title, level, semester, description FROM course_catalog ORDER BY level, semester, id"
-    ).fetchall()
+    rows = _cached_rows(
+        db, "SELECT id, title, level, semester, description FROM course_catalog ORDER BY level, semester, id")
     return jsonify({"catalog": [dict(r) for r in rows]})
 
 

@@ -310,12 +310,16 @@ _local = threading.local()
 def _reuse_pg(dsn):
     """Reuse one Postgres connection per thread (a fresh TLS connect to Neon costs
     over a second). A cheap ping detects connections Neon dropped while idle."""
+    import time
     c = getattr(_local, "conn", None)
     if c is not None:
         try:
-            c._raw.rollback()
-            c.execute("SELECT 1")
-            c._raw.rollback()
+            # a connection used in the last 15 s is alive: skip the ping round trip
+            if time.time() - getattr(_local, "used", 0) > 15:
+                c._raw.rollback()
+                c.execute("SELECT 1")
+                c._raw.rollback()
+            _local.used = time.time()
             return c
         except Exception:
             try:
@@ -325,6 +329,7 @@ def _reuse_pg(dsn):
             _local.conn = None
     c = connect_dsn(dsn)
     _local.conn = c
+    _local.used = time.time()
     return c
 
 
