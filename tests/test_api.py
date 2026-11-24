@@ -11,7 +11,7 @@ from degreepath import create_app
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app({"DATABASE": str(tmp_path / "test.sqlite3"), "TESTING": True})
+    app = create_app({"DATABASE": str(tmp_path / "test.sqlite3"), "TESTING": True, "FEED_AUTO": False})
     return app.test_client()
 
 
@@ -157,3 +157,31 @@ def test_empty_student_gets_zero_match(client):
     h = auth_headers(client)
     matches = client.get("/api/matches", headers=h).get_json()["matches"]
     assert all(m["match_pct"] == 0 for m in matches)
+
+
+def test_feed_linking_and_status(client):
+    """Insert a fake live job + course and check job -> missing skill -> course -> apply link."""
+    from degreepath.db import get_db
+
+    h = auth_headers(client)
+    app = client.application
+    with app.app_context():
+        db = get_db()
+        sid = db.execute("SELECT id FROM skills WHERE name='Python'").fetchone()["id"]
+        jid = db.execute(
+            "INSERT INTO live_jobs (source, ext_id, title, company, url) VALUES ('remotive','1','Python Dev','Acme','https://example.com/apply')"
+        ).lastrowid
+        db.execute("INSERT INTO live_job_skills (job_id, skill_id, importance) VALUES (?,?,3)", (jid, sid))
+        cid = db.execute(
+            "INSERT INTO live_courses (source, ext_id, title, url) VALUES ('mslearn','c1','Learn Python','https://learn.microsoft.com/x')"
+        ).lastrowid
+        db.execute("INSERT INTO live_course_skills (course_id, skill_id) VALUES (?,?)", (cid, sid))
+        db.commit()
+    st = client.get("/api/feed/status").get_json()
+    assert st["total_jobs"] == 1 and st["total_courses"] == 1
+    lst = client.get("/api/feed/jobs", headers=h).get_json()
+    assert lst["jobs"][0]["apply_url"] == "https://example.com/apply"
+    d = client.get(f"/api/feed/jobs/{jid}", headers=h).get_json()["job"]
+    urls = [c["url"] for s in d["roadmap"] for c in s["courses"]]
+    assert "https://learn.microsoft.com/x" in urls
+    assert client.get("/api/feed/jobs").status_code == 401

@@ -96,6 +96,53 @@ CREATE TABLE IF NOT EXISTS analyses (
     missing TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS live_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    ext_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    company TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    remote INTEGER NOT NULL DEFAULT 0,
+    url TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    posted_at TEXT DEFAULT '',
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (source, ext_id)
+);
+
+CREATE TABLE IF NOT EXISTS live_job_skills (
+    job_id INTEGER NOT NULL REFERENCES live_jobs(id) ON DELETE CASCADE,
+    skill_id INTEGER NOT NULL REFERENCES skills(id),
+    importance INTEGER NOT NULL DEFAULT 2,
+    PRIMARY KEY (job_id, skill_id)
+);
+
+CREATE TABLE IF NOT EXISTS live_courses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    ext_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT DEFAULT '',
+    url TEXT NOT NULL,
+    level TEXT DEFAULT '',
+    duration_min INTEGER DEFAULT 0,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (source, ext_id)
+);
+
+CREATE TABLE IF NOT EXISTS live_course_skills (
+    course_id INTEGER NOT NULL REFERENCES live_courses(id) ON DELETE CASCADE,
+    skill_id INTEGER NOT NULL REFERENCES skills(id),
+    PRIMARY KEY (course_id, skill_id)
+);
+
+CREATE TABLE IF NOT EXISTS feed_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    report TEXT NOT NULL DEFAULT '{}'
+);
 """
 
 

@@ -12,6 +12,7 @@
   <div class="nav-links">
     <a href="#/dashboard" data-route="dashboard">لوحة التحكم</a>
     <a href="#/courses" data-route="courses">موادي وكورساتي</a>
+    <a href="#/feed" data-route="feed">وظائف اليوم</a>
     <a href="#/jobs" data-route="jobs">الوظائف</a>
     <a href="#/profile" data-route="profile">ملفي الشخصي</a>
     <a href="#" id="logoutBtn">خروج</a>
@@ -98,6 +99,30 @@
   <div class="page">
     <a href="#/jobs" class="back-link">→ رجوع للوظائف</a>
     <div id="jobDetail"></div>
+  </div>
+</template>
+
+<template id="tpl-feed">
+  <div class="page">
+    <h2>وظائف اليوم وكورساتها المجانية</h2>
+    <p class="muted" id="feedStatus">...</p>
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="search" id="feedQ" placeholder="ابحث باسم الوظيفة أو الشركة" style="flex:1;min-width:180px">
+        <select id="feedSort"><option value="match">الأنسب لمهاراتك</option><option value="new">الأحدث</option></select>
+      </div>
+      <div id="feedSources" class="chips"></div>
+    </div>
+    <div id="feedList" class="grid"></div>
+    <div id="feedMore" style="text-align:center;margin:16px"></div>
+    <details class="card"><summary>مصادر البيانات وحدودها</summary><div id="feedSourcesInfo" class="muted"></div></details>
+  </div>
+</template>
+
+<template id="tpl-feed-detail">
+  <div class="page">
+    <a href="#/feed" class="back-link">→ رجوع لوظائف اليوم</a>
+    <div id="feedDetail"></div>
   </div>
 </template>
 

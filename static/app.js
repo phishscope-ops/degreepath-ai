@@ -367,6 +367,110 @@ async function showProfile() {
   };
 }
 
+
+/* ---------- live feed (daily jobs + linked free courses) ---------- */
+
+const feedState = { source: "", offset: 0 };
+
+function minutesLabel(m) {
+  if (!m) return "";
+  return m >= 60 ? Math.round(m / 60) + " ساعة" : m + " دقيقة";
+}
+
+function freeBadge(f) {
+  return f === "audit"
+    ? '<span class="chip" title="مجاني للمشاهدة، الشهادة مدفوعة">مجاني (Audit)</span>'
+    : '<span class="chip have">مجاني</span>';
+}
+
+function feedCard(j) {
+  const miss = j.missing.slice(0, 4).map((s) => skillChip(s, "missing")).join("");
+  return `<div class="card job-card" onclick="location.hash='#/feed/${j.id}'">
+    <h3>${esc(j.title)}</h3>
+    <p class="muted">${esc(j.company)} · ${esc(j.location)}${j.posted_at ? " · " + esc(j.posted_at) : ""}</p>
+    <p><span class="chip">${esc(j.source_name)}</span></p>
+    <p>نسبة التطابق: <b>${j.match_pct}%</b></p>${matchBar(j.match_pct)}
+    <div class="chips">${miss}</div>
+  </div>`;
+}
+
+async function loadFeed(append) {
+  const q = document.getElementById("feedQ").value.trim();
+  const sort = document.getElementById("feedSort").value;
+  const limit = 24;
+  if (!append) feedState.offset = 0;
+  const params = new URLSearchParams({ q, sort, limit, offset: feedState.offset });
+  if (feedState.source) params.set("source", feedState.source);
+  const data = await api("/feed/jobs?" + params.toString());
+  const list = document.getElementById("feedList");
+  const html = data.jobs.map(feedCard).join("");
+  if (append) list.insertAdjacentHTML("beforeend", html);
+  else list.innerHTML = html || '<p class="muted">لسه مفيش وظائف، البيانات بتتحمّل... جرّب بعد دقيقة.</p>';
+  feedState.offset += data.jobs.length;
+  const more = document.getElementById("feedMore");
+  more.innerHTML = feedState.offset < data.total
+    ? `<button class="btn primary" id="feedMoreBtn">عرض المزيد (${data.total - feedState.offset})</button>` : "";
+  const btn = document.getElementById("feedMoreBtn");
+  if (btn) btn.onclick = () => loadFeed(true);
+}
+
+async function showFeed() {
+  showNav("feed");
+  render("tpl-feed");
+  const st = await api("/feed/status");
+  const when = st.last_refresh_utc ? st.last_refresh_utc + " UTC" : "لسه";
+  document.getElementById("feedStatus").textContent = st.total_jobs
+    ? `${st.total_jobs} وظيفة من ${st.job_sources.length} مصادر، و${st.total_courses} كورس مجاني. آخر تحديث: ${when}. بيتحدث تلقائيًا كل 24 ساعة.`
+    : (st.refreshing ? "بنحمّل وظائف النهارده من المصادر... استنى دقيقة وحدّث الصفحة." : "جاري التحضير...");
+  const chips = ['<span class="chip" data-s="" style="cursor:pointer">الكل</span>']
+    .concat(st.job_sources.map((s) => `<span class="chip" data-s="${esc(s.source)}" style="cursor:pointer">${esc(s.name)} (${s.count})</span>`));
+  const box = document.getElementById("feedSources");
+  box.innerHTML = chips.join("");
+  const mark = () => box.querySelectorAll(".chip").forEach((c) => c.classList.toggle("have", c.dataset.s === feedState.source));
+  box.onclick = (e) => {
+    if (e.target.dataset && e.target.dataset.s !== undefined) {
+      feedState.source = e.target.dataset.s; mark(); loadFeed(false);
+    }
+  };
+  mark();
+  document.getElementById("feedSourcesInfo").innerHTML =
+    "<ul>" + st.job_sources.concat(st.course_sources).map((s) =>
+      `<li><a href="${esc(s.site)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${s.count})${s.note ? " - " + esc(s.note) : ""}</li>`).join("") +
+    "</ul><p>الوظائف دي من مصادر عامة بتسمح بالاستخدام، ومش من Wuzzuf أو LinkedIn لأنهم مفيهمش واجهة مجانية رسمية. معظمها ريموت وبيقبل من مصر، لكن اقرأ شرط الموقع قبل التقديم. بيانات الخدمة المجانية بتتحمّل من جديد مع كل تشغيل.</p>";
+  let timer;
+  document.getElementById("feedQ").oninput = () => { clearTimeout(timer); timer = setTimeout(() => loadFeed(false), 350); };
+  document.getElementById("feedSort").onchange = () => loadFeed(false);
+  await loadFeed(false);
+}
+
+async function showFeedDetail(id) {
+  showNav("feed");
+  render("tpl-feed-detail");
+  const { job: j } = await api("/feed/jobs/" + id);
+  const have = j.matched.map((s) => skillChip(s, "have")).join("") || '<span class="muted">لسه مفيش</span>';
+  const steps = j.roadmap.map((st) => `
+    <div class="card">
+      <h4>${st.step}. ${esc(st.skill_ar || st.skill)} <span class="muted">(${esc(st.skill)} · ${importanceLabel(st.importance)})</span></h4>
+      ${st.courses.length ? st.courses.map((c) => `
+        <p>📚 <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title)}</a>
+        <span class="muted">${esc(c.provider)}${c.duration_min ? " · " + minutesLabel(c.duration_min) : ""}</span> ${freeBadge(c.free)}</p>`).join("")
+        : '<p class="muted">مفيش كورس متسجل للمهارة دي لسه.</p>'}
+    </div>`).join("");
+  document.getElementById("feedDetail").innerHTML = `
+    <div class="card">
+      <h2>${esc(j.title)}</h2>
+      <p class="muted">${esc(j.company)} · ${esc(j.location)}${j.posted_at ? " · " + esc(j.posted_at) : ""} · المصدر: <a href="${esc(j.source_site)}" target="_blank" rel="noopener">${esc(j.source_name)}</a></p>
+      <p>نسبة التطابق: <b>${j.match_pct}%</b></p>${matchBar(j.match_pct)}
+      <h4>مهاراتك المطابقة</h4><div class="chips">${have}</div>
+      <h4>المهارات الناقصة</h4><div class="chips">${j.missing.map((s) => skillChip(s, "missing")).join("") || "مفيش، أنت جاهز ✅"}</div>
+      <p>${esc(j.description).slice(0, 700)}...</p>
+    </div>
+    <h3>١) الكورسات المجانية اللي تسد الفجوة</h3>
+    ${steps || "<p>أنت مغطي كل مهارات الوظيفة دي.</p>"}
+    <h3>٢) قدّم على الوظيفة</h3>
+    <p><a class="btn primary" href="${esc(j.apply_url)}" target="_blank" rel="noopener">قدّم على ${esc(j.source_name)} ↗</a></p>`;
+}
+
 /* ---------- router ---------- */
 
 const routes = {
@@ -374,6 +478,7 @@ const routes = {
   dashboard: showDashboard,
   courses: showCourses,
   jobs: showJobs,
+  feed: showFeed,
   profile: showProfile,
 };
 
@@ -387,6 +492,12 @@ async function route() {
   }
   if (state.token && page === "auth") {
     location.hash = "#/dashboard";
+    return;
+  }
+  if (page === "feed" && parts[1]) {
+    try { await showFeedDetail(parts[1]); } catch (err) {
+      app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
+    }
     return;
   }
   if (page === "jobs" && parts[1]) {

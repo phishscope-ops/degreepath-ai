@@ -19,6 +19,11 @@ def create_app(test_config=None):
     db.init_app(app)
     db.init_db(app)
 
+    from . import feed
+
+    with app.app_context():
+        feed.maybe_refresh(app, db.get_db())
+
     from .api import bp as api_bp
 
     app.register_blueprint(api_bp)

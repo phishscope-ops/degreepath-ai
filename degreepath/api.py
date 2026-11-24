@@ -2,10 +2,10 @@
 import json
 import sqlite3
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash
 
-from . import matching, nlp
+from . import feed, matching, nlp
 from .auth import (
     create_session,
     current_user,
@@ -307,3 +307,144 @@ def analysis(job_id):
             "roadmap": roadmap["steps"],
         }
     )
+
+
+# ---------------------------------------------------------------- live feed
+
+def _feed_job_row(db, j, user_skills):
+    reqs = db.execute(
+        """SELECT s.id, s.name, s.name_ar, js.importance FROM live_job_skills js
+           JOIN skills s ON s.id = js.skill_id WHERE js.job_id = ?
+           ORDER BY js.importance DESC, s.name""",
+        (j["id"],),
+    ).fetchall()
+    total = sum(r["importance"] for r in reqs) or 1
+    got = sum(r["importance"] for r in reqs if r["id"] in user_skills)
+    info = feed.SOURCE_INFO.get(j["source"], {})
+    return {
+        "id": j["id"], "title": j["title"], "company": j["company"],
+        "location": j["location"], "remote": bool(j["remote"]),
+        "posted_at": j["posted_at"], "source": j["source"],
+        "source_name": info.get("name", j["source"]), "source_site": info.get("site", ""),
+        "apply_url": j["url"],
+        "match_pct": round(100.0 * got / total, 1),
+        "n_skills": len(reqs),
+        "matched": [dict(r) for r in reqs if r["id"] in user_skills],
+        "missing": [dict(r) for r in reqs if r["id"] not in user_skills],
+    }
+
+
+@bp.get("/feed/status")
+def feed_status():
+    db = get_db()
+    feed.maybe_refresh(current_app, db)
+    jobs = db.execute("SELECT source, COUNT(*) AS c FROM live_jobs GROUP BY source").fetchall()
+    courses = db.execute("SELECT source, COUNT(*) AS c FROM live_courses GROUP BY source").fetchall()
+    last = feed.last_run(db)
+    return jsonify({
+        "refreshing": feed.is_running(),
+        "stale_after_hours": feed.STALE_HOURS,
+        "last_refresh_utc": last["finished_at"] if last else None,
+        "job_sources": [
+            {"source": r["source"], "name": feed.SOURCE_INFO[r["source"]]["name"],
+             "site": feed.SOURCE_INFO[r["source"]]["site"], "count": r["c"]}
+            for r in jobs if r["source"] in feed.SOURCE_INFO
+        ],
+        "course_sources": [
+            {"source": r["source"], "name": feed.SOURCE_INFO[r["source"]]["name"],
+             "site": feed.SOURCE_INFO[r["source"]]["site"],
+             "note": feed.SOURCE_INFO[r["source"]]["note"], "count": r["c"]}
+            for r in courses if r["source"] in feed.SOURCE_INFO
+        ],
+        "total_jobs": sum(r["c"] for r in jobs),
+        "total_courses": sum(r["c"] for r in courses),
+        "last_report": last,
+    })
+
+
+@bp.get("/feed/jobs")
+@login_required
+def feed_jobs():
+    db = get_db()
+    feed.maybe_refresh(current_app, db)
+    user_skills = matching.student_skill_ids(db, g.user["id"])
+    q = (request.args.get("q") or "").strip().lower()
+    source = request.args.get("source") or ""
+    sort = request.args.get("sort") or "match"
+    try:
+        limit = max(1, min(int(request.args.get("limit", 40)), 100))
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        limit, offset = 40, 0
+    sql = "SELECT * FROM live_jobs"
+    args, where = [], []
+    if source:
+        where.append("source = ?")
+        args.append(source)
+    if q:
+        where.append("(lower(title) LIKE ? OR lower(company) LIKE ?)")
+        args += [f"%{q}%", f"%{q}%"]
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    rows = [_feed_job_row(db, j, user_skills) for j in db.execute(sql, args).fetchall()]
+    if sort == "new":
+        rows.sort(key=lambda r: r["posted_at"] or "", reverse=True)
+    else:
+        rows.sort(key=lambda r: (r["match_pct"] * min(1.0, r["n_skills"] / 4), r["posted_at"] or ""), reverse=True)
+    # mix sources: when sorted by match, no source may take every top slot
+    total = len(rows)
+    if sort != "new" and not source:
+        rows = _interleave(rows)
+    return jsonify({"total": total, "jobs": rows[offset: offset + limit]})
+
+
+def _interleave(rows):
+    """Round-robin by source while keeping each source's own order (best first)."""
+    buckets = {}
+    for r in rows:
+        buckets.setdefault(r["source"], []).append(r)
+    out, order = [], sorted(buckets, key=lambda s: -buckets[s][0]["match_pct"])
+    while any(buckets.values()):
+        for s in order:
+            if buckets[s]:
+                out.append(buckets[s].pop(0))
+    return out
+
+
+@bp.get("/feed/jobs/<int:job_id>")
+@login_required
+def feed_job_detail(job_id):
+    db = get_db()
+    j = db.execute("SELECT * FROM live_jobs WHERE id = ?", (job_id,)).fetchone()
+    if j is None:
+        return jsonify({"error": "الوظيفة غير موجودة أو انتهت (الوظائف بتتحدث يوميًا)"}), 404
+    user_skills = matching.student_skill_ids(db, g.user["id"])
+    row = _feed_job_row(db, j, user_skills)
+    row["description"] = j["description"]
+    steps = []
+    for i, m in enumerate(row["missing"], 1):
+        steps.append({
+            "step": i, "skill": m["name"], "skill_ar": m["name_ar"], "importance": m["importance"],
+            "courses": feed.courses_for_skill(db, m["id"]),
+        })
+    row["roadmap"] = steps
+    return jsonify({"job": row})
+
+
+@bp.post("/feed/refresh")
+@login_required
+def feed_refresh():
+    db = get_db()
+    last = feed.last_run(db)
+    if feed.is_running():
+        return jsonify({"started": False, "message": "التحديث شغال دلوقتي"}), 202
+    if last:
+        try:
+            from datetime import datetime, timezone
+            t = datetime.strptime(last["finished_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - t).total_seconds() < 1800:
+                return jsonify({"started": False,
+                                "message": "اتحدّث من أقل من 30 دقيقة، جرب بعدين"}), 429
+        except Exception:
+            pass
+    return jsonify({"started": feed.refresh_in_background(current_app)})
