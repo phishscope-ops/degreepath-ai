@@ -201,6 +201,7 @@ def _pg_sql(sql):
     m = re.match(r"(?is)^INSERT\s+INTO\s+(\w+)", s)
     if m and m.group(1).lower() in _ID_TABLES and "RETURNING" not in s.upper():
         s = s.rstrip().rstrip(";") + " RETURNING id"
+    s = s.replace("%", "%%")  # escape literal % (e.g. %20 in URLs) for psycopg2
     s = s.replace("?", "%s")
     return s
 
@@ -323,7 +324,7 @@ def close_db(_exc=None):
 def _table_columns(db, table):
     if isinstance(db, _PgConn):
         rows = db.execute(
-            "SELECT column_name AS name FROM information_schema.columns WHERE table_name = %s",
+            "SELECT column_name AS name FROM information_schema.columns WHERE table_name = ?",
             (table,),
         ).fetchall()
     else:

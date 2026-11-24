@@ -87,3 +87,12 @@ def test_admin_page_served(client):
     res = client.get("/admin")
     assert res.status_code == 200
     assert "admin.js" in res.get_data(as_text=True)
+
+
+def test_pg_sql_escapes_literal_percent():
+    """Literal % (e.g. %20 in URLs) must not break psycopg2 param parsing."""
+    from degreepath.db import _pg_sql
+
+    out = _pg_sql("INSERT INTO resources (skill_id, title, url) VALUES (?, ?, 'https://x.com/a%20b')")
+    assert "%20".replace("%", "%%") in out
+    assert out.count("%s") == 2
