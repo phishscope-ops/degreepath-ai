@@ -166,6 +166,12 @@ def init_db(app):
         db = get_db()
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA)
+        for table, col, ddl in (("live_jobs", "field", "TEXT DEFAULT 'other'"),
+                                ("live_jobs", "country", "TEXT DEFAULT ''"),
+                                ("live_courses", "field", "TEXT DEFAULT 'other'")):
+            cols = {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}
+            if col not in cols:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         db.commit()
         from .seed import seed_if_empty
 

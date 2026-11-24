@@ -27,7 +27,11 @@ from . import nlp
 UA = {"User-Agent": "DegreePathAI/1.2 (student graduation project; daily fetch)"}
 TIMEOUT = 40
 STALE_HOURS = 24
-PER_SOURCE_JOB_CAP = 120
+JOB_CAPS = {"workable": 220, "arbeitnow": 30, "jobicy": 20, "himalayas": 15,
+            "remoteok": 10, "remotive": 5}          # ~300 open jobs, ~3/4 in Egypt
+PER_COMPANY_CAP = 5
+EXTRA_COURSES = 300          # non-tech courses (no skill match) added on top
+MAX_AGE_DAYS = 60            # windowed sources: keep until closed, or this old
 MAX_DESC = 1800
 
 _lock = threading.Lock()
@@ -42,6 +46,8 @@ SOURCE_INFO = {
                  "note": "رابط التقديم يفتح Remote OK"},
     "jobicy": {"name": "Jobicy", "kind": "job", "site": "https://jobicy.com",
                "note": "رابط التقديم يفتح Jobicy"},
+    "workable": {"name": "Workable (مصر)", "kind": "job", "site": "https://jobs.workable.com/search?location=Egypt",
+                 "note": "وظائف داخل مصر، التقديم من صفحة الشركة على Workable"},
     "himalayas": {"name": "Himalayas", "kind": "job", "site": "https://himalayas.app",
                   "note": "رابط التقديم يفتح Himalayas"},
     "mslearn": {"name": "Microsoft Learn", "kind": "course", "site": "https://learn.microsoft.com/training/",
@@ -158,10 +164,67 @@ def fetch_himalayas():
     return out
 
 
+def fetch_workable(max_pages=140):
+    """Every open Workable job located in Egypt (all fields). Full listing, so a job that
+    disappears from it has been closed."""
+    out, token = [], None
+    for _ in range(max_pages):
+        params = {"location": "Egypt", "limit": 20}
+        if token:
+            params["pageToken"] = token
+        d = _get("https://jobs.workable.com/api/v1/jobs", params=params)
+        for j in d.get("jobs", []):
+            loc = j.get("location") or {}
+            if (loc.get("countryName") or "") != "Egypt" or j.get("state") != "published":
+                continue
+            place = ", ".join(x for x in (loc.get("city"), loc.get("subregion"), "Egypt") if x)
+            desc = " ".join(clean(j.get(k), 900) for k in ("description", "requirementsSection"))
+            out.append(dict(
+                ext_id=j["id"], title=clean(j["title"], 200),
+                company=(j.get("company") or {}).get("title", ""),
+                location=place, remote=1 if j.get("workplace") == "remote" else 0,
+                url=j["url"], description=desc[:MAX_DESC],
+                posted_at=_iso(j.get("created")), tags=j.get("department") or "",
+                country="EG",
+            ))
+        token = d.get("nextPageToken")
+        if not token:
+            break
+        time.sleep(0.1)
+    return out
+
+
 JOB_FETCHERS = {
-    "remotive": fetch_remotive, "arbeitnow": fetch_arbeitnow, "remoteok": fetch_remoteok,
-    "jobicy": fetch_jobicy, "himalayas": fetch_himalayas,
+    "workable": fetch_workable, "arbeitnow": fetch_arbeitnow, "jobicy": fetch_jobicy,
+    "himalayas": fetch_himalayas, "remoteok": fetch_remoteok, "remotive": fetch_remotive,
 }
+FULL_LISTING = {"workable"}   # a missing job is closed; other sources only expose a window
+
+FIELDS = [
+    ("tech", "تكنولوجيا وبرمجة", r"software|developer|programmer|devops|data (?:scien|engineer|analy)|machine learning|\bai\b|\bit\b|cyber|security eng|backend|front-?end|full.?stack|qa |tester|cloud|network|system admin|sap |erp|odoo|mobile|android|ios|web |database|python|java\b|\.net|react|technical support|tech"),
+    ("sales", "مبيعات وتسويق", r"sales|marketing|business development|seo|social media|brand|content|copywrit|growth|account manager|telesales|e-?commerce|media buyer|digital"),
+    ("finance", "محاسبة ومالية", r"account|financ|audit|tax|treasury|payroll|bank|invest|credit|budget|procurement|purchas"),
+    ("hr", "موارد بشرية وإدارة", r"\bhr\b|human resources|recruit|talent|admin|office manager|secretary|receptionist|executive assistant|project manag|operations manag|\bpmo\b|manager"),
+    ("eng", "هندسة وتصنيع", r"engineer|mechanical|electrical|civil|architect|maintenance|production|manufactur|quality|safety|hse|technician|site |construction|planning"),
+    ("health", "طب وصيدلة", r"doctor|physician|nurse|pharmac|medical|clinic|dental|dentist|health|patient|laborator|physio"),
+    ("edu", "تعليم وتدريب", r"teacher|tutor|instructor|school|education|trainer|lecturer|curriculum|academic|kindergarten|nursery|coach"),
+    ("design", "تصميم وإبداع", r"design|graphic|ui/?ux|video|motion|animat|photograph|editor|creative|illustrat|art director"),
+    ("service", "خدمة عملاء ودعم", r"customer|support|call center|service|agent|care|representative|hospitality|hotel|front desk"),
+    ("ops", "لوجستيات وعمليات", r"logistic|supply chain|warehouse|driver|delivery|shipping|inventory|operations|store|retail|cashier|supervisor|coordinator"),
+    ("legal", "قانون واستشارات", r"legal|lawyer|law |counsel|compliance|consult|research"),
+]
+FIELD_LABELS = {k: v for k, v, _ in FIELDS}
+FIELD_LABELS["other"] = "مجالات أخرى"
+
+
+def classify_field(title, tags=""):
+    """Broad field for the filter chips: title first, then tags/department."""
+    for text in (title or "", f"{title} {tags}"):
+        low = text.lower()
+        for key, _label, rx in FIELDS:
+            if re.search(rx, low):
+                return key
+    return "other"
 
 
 # -------------------------------------------------------------- course sources
@@ -236,8 +299,54 @@ def claim_run(db_path):
         db.close()
 
 
+def _url_closed(url):
+    """True only when the posting page clearly says the job is gone (404/410)."""
+    try:
+        r = requests.get(url, headers=UA, timeout=12, allow_redirects=True, stream=True)
+        r.close()
+        return r.status_code in (404, 410)
+    except Exception:
+        return False
+
+
+def _pick_jobs(db, src, items, alias_index):
+    """Choose which jobs to store. Jobs already stored and still open at the source are
+    always kept (a job leaves only when it closes). New ones fill the cap, spread across
+    fields and companies."""
+    cap = JOB_CAPS.get(src, 20)
+    have = {r["ext_id"] for r in db.execute("SELECT ext_id FROM live_jobs WHERE source=?", (src,))}
+    by_id = {it["ext_id"]: it for it in items if it.get("url")}
+    keep = [by_id[e] for e in have if e in by_id]
+    per_company = {}
+    for it in keep:
+        per_company[it["company"]] = per_company.get(it["company"], 0) + 1
+    fresh = [it for e, it in by_id.items() if e not in have]
+    fresh.sort(key=lambda it: it["posted_at"] or "", reverse=True)
+    buckets = {}
+    for it in fresh:
+        it["field"] = classify_field(it["title"], it["tags"])
+        buckets.setdefault(it["field"], []).append(it)
+    order = sorted(buckets, key=lambda f: -len(buckets[f]))
+    while len(keep) < cap and any(buckets.values()):
+        for f in order:
+            while buckets[f]:
+                it = buckets[f].pop(0)
+                if per_company.get(it["company"], 0) >= PER_COMPANY_CAP:
+                    continue
+                per_company[it["company"]] = per_company.get(it["company"], 0) + 1
+                keep.append(it)
+                break
+            if len(keep) >= cap:
+                break
+    return keep
+
+
 def refresh(db_path, run_id=None):
-    """Fetch every source, store jobs/courses, tag them with skills. Returns a report."""
+    """Fetch every source, store jobs/courses, tag them with skills. Returns a report.
+
+    Jobs persist between refreshes: a stored job is removed only when its source no longer
+    lists it (closed/expired), or, for sources that only show a recent window, when its
+    posting page is gone (404/410) or it is older than MAX_AGE_DAYS."""
     started = _now()
     report = {"started_at": started, "sources": {}}
     db = _connect(db_path)
@@ -249,29 +358,28 @@ def refresh(db_path, run_id=None):
     for src, fn in JOB_FETCHERS.items():
         try:
             items = fn()
-            scored = []
-            for it in items:
-                if not it.get("url"):
-                    continue
+            if not items:
+                raise RuntimeError("source returned no jobs, keeping stored ones")
+            kept = _pick_jobs(db, src, items, alias_index)
+            seen = set()
+            for it in kept:
+                seen.add(it["ext_id"])
                 text = f"{it['title']} {it['tags']} {it['description']}"
                 ids = nlp.extract_skills(text, alias_index)
-                if len(ids) < 2:
-                    continue
                 core = _title_skill_ids(it["title"], it["tags"], alias_index)
-                scored.append((len(ids), it, ids, core))
-            scored.sort(key=lambda t: t[1]["posted_at"] or "", reverse=True)
-            kept = scored[:PER_SOURCE_JOB_CAP]
-            for _n, it, ids, core in kept:
+                fld = it.get("field") or classify_field(it["title"], it["tags"])
+                country = it.get("country", "")
                 db.execute(
                     """INSERT INTO live_jobs (source, ext_id, title, company, location, remote,
-                       url, description, posted_at, fetched_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)
+                       url, description, posted_at, fetched_at, field, country)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(source, ext_id) DO UPDATE SET title=excluded.title,
                        company=excluded.company, location=excluded.location, url=excluded.url,
                        description=excluded.description, posted_at=excluded.posted_at,
-                       fetched_at=excluded.fetched_at""",
+                       fetched_at=excluded.fetched_at, field=excluded.field,
+                       country=excluded.country""",
                     (src, it["ext_id"], it["title"][:200], it["company"][:120], it["location"][:120],
-                     it["remote"], it["url"], it["description"], it["posted_at"], _now()),
+                     it["remote"], it["url"], it["description"], it["posted_at"], _now(), fld, country),
                 )
                 jid = db.execute("SELECT id FROM live_jobs WHERE source=? AND ext_id=?",
                                  (src, it["ext_id"])).fetchone()["id"]
@@ -279,11 +387,33 @@ def refresh(db_path, run_id=None):
                 for sid in ids:
                     db.execute("INSERT INTO live_job_skills (job_id, skill_id, importance) VALUES (?,?,?)",
                                (jid, sid, 3 if sid in core else 2))
-                db.commit()
-            # source succeeded: drop its rows that were not in this fetch (expired jobs)
-            db.execute("DELETE FROM live_jobs WHERE source=? AND fetched_at < ?", (src, started))
             db.commit()
-            report["sources"][src] = {"ok": True, "fetched": len(items), "stored": len(kept)}
+            # jobs stored earlier but not kept this time
+            listed = {it["ext_id"] for it in items}
+            removed = 0
+            checks = 0
+            for r in db.execute("SELECT id, ext_id, url, posted_at FROM live_jobs WHERE source=?",
+                                (src,)).fetchall():
+                if r["ext_id"] in seen:
+                    continue
+                gone = False
+                if src in FULL_LISTING:
+                    gone = r["ext_id"] not in listed          # closed at the source
+                else:
+                    if r["ext_id"] in listed:
+                        continue                              # still open, just over the cap
+                    old = (r["posted_at"] or "9999") < (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
+                    if old:
+                        gone = True
+                    elif checks < 40:
+                        checks += 1
+                        gone = _url_closed(r["url"])
+                if gone:
+                    db.execute("DELETE FROM live_jobs WHERE id=?", (r["id"],))
+                    removed += 1
+            db.commit()
+            report["sources"][src] = {"ok": True, "fetched": len(items), "stored": len(kept),
+                                      "removed_closed": removed}
         except Exception as e:  # keep old rows for this source, report the failure
             db.rollback()
             report["sources"][src] = {"ok": False, "error": str(e)[:200]}
@@ -291,19 +421,26 @@ def refresh(db_path, run_id=None):
     for src, fn in COURSE_FETCHERS.items():
         try:
             items = fn()
-            stored = 0
+            if not items:
+                raise RuntimeError("source returned no courses, keeping stored ones")
+            stored, extra, listed = 0, 0, set()
             for it in items:
                 ids = nlp.extract_skills(f"{it['title']} {it['summary']}", alias_index)
                 if not ids:
-                    continue
+                    if extra >= EXTRA_COURSES or src != "coursera":
+                        continue
+                    extra += 1
+                fld = classify_field(it["title"], it["summary"][:200])
+                listed.add(it["ext_id"])
                 db.execute(
                     """INSERT INTO live_courses (source, ext_id, title, summary, url, level,
-                       duration_min, fetched_at) VALUES (?,?,?,?,?,?,?,?)
+                       duration_min, fetched_at, field) VALUES (?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(source, ext_id) DO UPDATE SET title=excluded.title,
                        summary=excluded.summary, url=excluded.url, level=excluded.level,
-                       duration_min=excluded.duration_min, fetched_at=excluded.fetched_at""",
+                       duration_min=excluded.duration_min, fetched_at=excluded.fetched_at,
+                       field=excluded.field""",
                     (src, it["ext_id"], it["title"][:200], it["summary"], it["url"],
-                     it["level"], it["duration_min"], _now()),
+                     it["level"], it["duration_min"], _now(), fld),
                 )
                 cid = db.execute("SELECT id FROM live_courses WHERE source=? AND ext_id=?",
                                  (src, it["ext_id"])).fetchone()["id"]
@@ -314,6 +451,7 @@ def refresh(db_path, run_id=None):
                 stored += 1
                 if stored % 100 == 0:
                     db.commit()
+            # courses no longer in the catalog are gone
             db.execute("DELETE FROM live_courses WHERE source=? AND fetched_at < ?", (src, started))
             db.commit()
             report["sources"][src] = {"ok": True, "fetched": len(items), "stored": stored}

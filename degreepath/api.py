@@ -325,6 +325,8 @@ def _feed_job_row(db, j, user_skills):
         "id": j["id"], "title": j["title"], "company": j["company"],
         "location": j["location"], "remote": bool(j["remote"]),
         "posted_at": j["posted_at"], "source": j["source"],
+        "field": j["field"] or "other", "field_label": feed.FIELD_LABELS.get(j["field"] or "other", ""),
+        "egypt": (j["country"] or "") == "EG",
         "source_name": info.get("name", j["source"]), "source_site": info.get("site", ""),
         "apply_url": j["url"],
         "match_pct": round(100.0 * got / total, 1),
@@ -357,6 +359,17 @@ def feed_status():
             for r in courses if r["source"] in feed.SOURCE_INFO
         ],
         "total_jobs": sum(r["c"] for r in jobs),
+        "egypt_jobs": db.execute("SELECT COUNT(*) FROM live_jobs WHERE country='EG'").fetchone()[0],
+        "job_fields": [
+            {"field": r["f"], "label": feed.FIELD_LABELS.get(r["f"], r["f"]), "count": r["c"]}
+            for r in db.execute(
+                "SELECT COALESCE(field,'other') AS f, COUNT(*) AS c FROM live_jobs GROUP BY f ORDER BY c DESC")
+        ],
+        "course_fields": [
+            {"field": r["f"], "label": feed.FIELD_LABELS.get(r["f"], r["f"]), "count": r["c"]}
+            for r in db.execute(
+                "SELECT COALESCE(field,'other') AS f, COUNT(*) AS c FROM live_courses GROUP BY f ORDER BY c DESC")
+        ],
         "total_courses": sum(r["c"] for r in courses),
         "last_report": last,
     })
@@ -384,6 +397,15 @@ def feed_jobs():
     if q:
         where.append("(lower(title) LIKE ? OR lower(company) LIKE ?)")
         args += [f"%{q}%", f"%{q}%"]
+    field = request.args.get("field") or ""
+    if field:
+        where.append("field = ?")
+        args.append(field)
+    where_country = request.args.get("country") or ""
+    if where_country == "eg":
+        where.append("country = 'EG'")
+    elif where_country == "world":
+        where.append("COALESCE(country,'') <> 'EG'")
     if where:
         sql += " WHERE " + " AND ".join(where)
     rows = [_feed_job_row(db, j, user_skills) for j in db.execute(sql, args).fetchall()]
@@ -393,22 +415,63 @@ def feed_jobs():
         rows.sort(key=lambda r: (r["match_pct"] * min(1.0, r["n_skills"] / 4), r["posted_at"] or ""), reverse=True)
     # mix sources: when sorted by match, no source may take every top slot
     total = len(rows)
-    if sort != "new" and not source:
+    if not source and not where_country:
         rows = _interleave(rows)
     return jsonify({"total": total, "jobs": rows[offset: offset + limit]})
 
 
 def _interleave(rows):
-    """Round-robin by source while keeping each source's own order (best first)."""
-    buckets = {}
-    for r in rows:
-        buckets.setdefault(r["source"], []).append(r)
-    out, order = [], sorted(buckets, key=lambda s: -buckets[s][0]["match_pct"])
-    while any(buckets.values()):
-        for s in order:
-            if buckets[s]:
-                out.append(buckets[s].pop(0))
+    """Egypt jobs lead: three Egypt jobs for every one from abroad, keeping the chosen order."""
+    eg = [r for r in rows if r["egypt"]]
+    world = [r for r in rows if not r["egypt"]]
+    out = []
+    while eg or world:
+        for _ in range(3):
+            if eg:
+                out.append(eg.pop(0))
+        if world:
+            out.append(world.pop(0))
     return out
+
+
+@bp.get("/feed/courses")
+@login_required
+def feed_courses():
+    db = get_db()
+    q = (request.args.get("q") or "").strip().lower()
+    field = request.args.get("field") or ""
+    source = request.args.get("source") or ""
+    try:
+        limit = max(1, min(int(request.args.get("limit", 30)), 100))
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        limit, offset = 30, 0
+    where, args = [], []
+    if q:
+        where.append("(lower(title) LIKE ? OR lower(summary) LIKE ?)")
+        args += [f"%{q}%", f"%{q}%"]
+    if field:
+        where.append("field = ?")
+        args.append(field)
+    if source:
+        where.append("source = ?")
+        args.append(source)
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    total = db.execute("SELECT COUNT(*) FROM live_courses" + w, args).fetchone()[0]
+    rows = db.execute(
+        "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses" + w
+        + " ORDER BY (source='coursera') DESC, id LIMIT ? OFFSET ?", args + [limit, offset]).fetchall()
+    out = []
+    for r in rows:
+        info = feed.SOURCE_INFO.get(r["source"], {})
+        out.append({
+            "id": r["id"], "title": r["title"], "summary": r["summary"], "url": r["url"],
+            "level": r["level"], "duration_min": r["duration_min"],
+            "provider": info.get("name", r["source"]),
+            "free": "audit" if r["source"] == "coursera" else "free",
+            "field_label": feed.FIELD_LABELS.get(r["field"] or "other", ""),
+        })
+    return jsonify({"total": total, "courses": out})
 
 
 @bp.get("/feed/jobs/<int:job_id>")

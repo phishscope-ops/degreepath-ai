@@ -185,3 +185,31 @@ def test_feed_linking_and_status(client):
     urls = [c["url"] for s in d["roadmap"] for c in s["courses"]]
     assert "https://learn.microsoft.com/x" in urls
     assert client.get("/api/feed/jobs").status_code == 401
+
+
+def test_feed_egypt_filter_fields_and_courses(client):
+    from degreepath.db import get_db
+
+    h = auth_headers(client)
+    with client.application.app_context():
+        db = get_db()
+        db.execute("INSERT INTO live_jobs (source, ext_id, title, company, url, country, field) VALUES ('workable','a','Accountant','X','https://e.com/a','EG','finance')")
+        db.execute("INSERT INTO live_jobs (source, ext_id, title, company, url, country, field) VALUES ('arbeitnow','b','Dev','Y','https://e.com/b','','tech')")
+        db.execute("INSERT INTO live_courses (source, ext_id, title, url, field) VALUES ('coursera','c','Marketing 101','https://c.com/x','sales')")
+        db.commit()
+    eg = client.get("/api/feed/jobs?country=eg", headers=h).get_json()
+    assert [j["title"] for j in eg["jobs"]] == ["Accountant"] and eg["jobs"][0]["egypt"]
+    assert client.get("/api/feed/jobs?field=tech", headers=h).get_json()["total"] == 1
+    st = client.get("/api/feed/status").get_json()
+    assert st["egypt_jobs"] == 1 and st["job_fields"]
+    cs = client.get("/api/feed/courses?field=sales", headers=h).get_json()
+    assert cs["total"] == 1 and cs["courses"][0]["free"] == "audit"
+
+
+def test_feed_field_classifier():
+    from degreepath import feed
+
+    assert feed.classify_field("Senior Accountant") == "finance"
+    assert feed.classify_field("Arabic Teacher") == "edu"
+    assert feed.classify_field("Backend Developer") == "tech"
+    assert feed.classify_field("zzz") == "other"

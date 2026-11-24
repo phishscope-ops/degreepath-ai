@@ -2,22 +2,25 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
 <title>DegreePath AI - طريقك من الدراسة للوظيفة</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <nav id="navbar" class="hidden">
-  <div class="nav-brand">🎓 DegreePath AI</div>
-  <div class="nav-links">
-    <a href="#/dashboard" data-route="dashboard">لوحة التحكم</a>
-    <a href="#/courses" data-route="courses">موادي وكورساتي</a>
-    <a href="#/feed" data-route="feed">وظائف اليوم</a>
-    <a href="#/jobs" data-route="jobs">الوظائف</a>
-    <a href="#/profile" data-route="profile">ملفي الشخصي</a>
-    <a href="#" id="logoutBtn">خروج</a>
+  <header class="topbar">
+    <div class="nav-brand">🎓 DegreePath AI</div>
+    <div class="nav-user" id="navUser"></div>
+    <a href="#" id="logoutBtn" class="logout" aria-label="خروج">خروج</a>
+  </header>
+  <div class="nav-links tabbar">
+    <a href="#/dashboard" data-route="dashboard"><i>🏠</i><span>الرئيسية</span></a>
+    <a href="#/feed" data-route="feed"><i>🔥</i><span>وظائف اليوم</span></a>
+    <a href="#/jobs" data-route="jobs"><i>💼</i><span>الوظائف</span></a>
+    <a href="#/courses" data-route="courses"><i>📚</i><span>موادي</span></a>
+    <a href="#/profile" data-route="profile"><i>👤</i><span>ملفي</span></a>
   </div>
-  <div class="nav-user" id="navUser"></div>
 </nav>
 
 <main id="app"></main>
@@ -104,17 +107,20 @@
 
 <template id="tpl-feed">
   <div class="page">
-    <h2>وظائف اليوم وكورساتها المجانية</h2>
+    <h2>وظائف اليوم</h2>
     <p class="muted" id="feedStatus">...</p>
-    <div class="card">
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input type="search" id="feedQ" placeholder="ابحث باسم الوظيفة أو الشركة" style="flex:1;min-width:180px">
-        <select id="feedSort"><option value="match">الأنسب لمهاراتك</option><option value="new">الأحدث</option></select>
-      </div>
-      <div id="feedSources" class="chips"></div>
+    <div class="seg" id="feedTabs">
+      <button data-t="jobs" class="on">وظائف</button>
+      <button data-t="courses">كورسات مجانية</button>
     </div>
-    <div id="feedList" class="grid"></div>
-    <div id="feedMore" style="text-align:center;margin:16px"></div>
+    <div class="filters">
+      <input type="search" id="feedQ" placeholder="ابحث باسم الوظيفة أو الشركة" enterkeyhint="search">
+      <div class="chiprow" id="feedCountry"></div>
+      <div class="chiprow" id="feedFields"></div>
+      <select id="feedSort"><option value="new">الأحدث</option><option value="match">الأنسب لمهاراتك</option></select>
+    </div>
+    <div id="feedList" class="list"></div>
+    <div id="feedMore" class="more"></div>
     <details class="card"><summary>مصادر البيانات وحدودها</summary><div id="feedSourcesInfo" class="muted"></div></details>
   </div>
 </template>

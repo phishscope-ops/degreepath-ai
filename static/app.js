@@ -370,7 +370,7 @@ async function showProfile() {
 
 /* ---------- live feed (daily jobs + linked free courses) ---------- */
 
-const feedState = { source: "", offset: 0 };
+const feedState = { tab: "jobs", country: "eg", field: "", offset: 0, fields: {}, st: null };
 
 function minutesLabel(m) {
   if (!m) return "";
@@ -384,59 +384,83 @@ function freeBadge(f) {
 }
 
 function feedCard(j) {
-  const miss = j.missing.slice(0, 4).map((s) => skillChip(s, "missing")).join("");
-  return `<div class="card job-card" onclick="location.hash='#/feed/${j.id}'">
-    <h3>${esc(j.title)}</h3>
-    <p class="muted">${esc(j.company)} · ${esc(j.location)}${j.posted_at ? " · " + esc(j.posted_at) : ""}</p>
-    <p><span class="chip">${esc(j.source_name)}</span></p>
-    <p>نسبة التطابق: <b>${j.match_pct}%</b></p>${matchBar(j.match_pct)}
-    <div class="chips">${miss}</div>
-  </div>`;
+  const miss = j.n_skills ? j.missing.slice(0, 3).map((s) => skillChip(s, "missing")).join("") : "";
+  const flag = j.egypt ? "🇪🇬 " : "🌍 ";
+  return `<a class="card jobc" href="#/feed/${j.id}">
+    <div class="jobc-top"><h3>${esc(j.title)}</h3>${j.n_skills ? `<b class="pct">${j.match_pct}%</b>` : ""}</div>
+    <p class="muted">${esc(j.company)}</p>
+    <p class="meta">${flag}${esc(j.location)}${j.posted_at ? " · " + esc(j.posted_at) : ""}</p>
+    <div class="chips"><span class="chip">${esc(j.field_label)}</span>${miss}</div>
+  </a>`;
+}
+
+function courseCard(c) {
+  return `<a class="card jobc" href="${esc(c.url)}" target="_blank" rel="noopener">
+    <div class="jobc-top"><h3>${esc(c.title)}</h3></div>
+    <p class="muted">${esc(c.summary).slice(0, 110)}${c.summary.length > 110 ? "…" : ""}</p>
+    <div class="chips"><span class="chip">${esc(c.provider)}</span>${freeBadge(c.free)}<span class="chip">${esc(c.field_label)}</span>${c.duration_min ? `<span class="chip">${minutesLabel(c.duration_min)}</span>` : ""}</div>
+  </a>`;
 }
 
 async function loadFeed(append) {
   const q = document.getElementById("feedQ").value.trim();
   const sort = document.getElementById("feedSort").value;
-  const limit = 24;
+  const isJobs = feedState.tab === "jobs";
   if (!append) feedState.offset = 0;
-  const params = new URLSearchParams({ q, sort, limit, offset: feedState.offset });
-  if (feedState.source) params.set("source", feedState.source);
-  const data = await api("/feed/jobs?" + params.toString());
+  const params = new URLSearchParams({ q, sort, limit: 20, offset: feedState.offset });
+  if (feedState.field) params.set("field", feedState.field);
+  if (isJobs && feedState.country) params.set("country", feedState.country);
+  const data = await api((isJobs ? "/feed/jobs?" : "/feed/courses?") + params.toString());
+  const items = isJobs ? data.jobs : data.courses;
   const list = document.getElementById("feedList");
-  const html = data.jobs.map(feedCard).join("");
+  const html = items.map(isJobs ? feedCard : courseCard).join("");
   if (append) list.insertAdjacentHTML("beforeend", html);
-  else list.innerHTML = html || '<p class="muted">لسه مفيش وظائف، البيانات بتتحمّل... جرّب بعد دقيقة.</p>';
-  feedState.offset += data.jobs.length;
+  else list.innerHTML = html || '<p class="empty-state">مفيش نتائج. جرّب مجال تاني أو "الكل".</p>';
+  feedState.offset += items.length;
   const more = document.getElementById("feedMore");
   more.innerHTML = feedState.offset < data.total
-    ? `<button class="btn primary" id="feedMoreBtn">عرض المزيد (${data.total - feedState.offset})</button>` : "";
+    ? `<button class="btn primary block" id="feedMoreBtn">عرض المزيد (${data.total - feedState.offset})</button>` : "";
   const btn = document.getElementById("feedMoreBtn");
   if (btn) btn.onclick = () => loadFeed(true);
+}
+
+function drawFilters() {
+  const st = feedState.st, isJobs = feedState.tab === "jobs";
+  const c = document.getElementById("feedCountry");
+  c.classList.toggle("hidden", !isJobs);
+  c.innerHTML = [["eg", `🇪🇬 مصر (${st.egypt_jobs})`], ["world", `🌍 برّه مصر (${st.total_jobs - st.egypt_jobs})`], ["", "الكل"]]
+    .map(([v, l]) => `<button class="chipb${feedState.country === v ? " on" : ""}" data-c="${v}">${l}</button>`).join("");
+  const fields = isJobs ? st.job_fields : st.course_fields;
+  document.getElementById("feedFields").innerHTML =
+    `<button class="chipb${feedState.field === "" ? " on" : ""}" data-f="">كل المجالات</button>` +
+    fields.map((f) => `<button class="chipb${feedState.field === f.field ? " on" : ""}" data-f="${esc(f.field)}">${esc(f.label)} (${f.count})</button>`).join("");
+  document.getElementById("feedSort").classList.toggle("hidden", !isJobs);
+  document.querySelectorAll("#feedTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === feedState.tab));
 }
 
 async function showFeed() {
   showNav("feed");
   render("tpl-feed");
   const st = await api("/feed/status");
-  const when = st.last_refresh_utc ? st.last_refresh_utc + " UTC" : "لسه";
+  feedState.st = st;
+  const when = st.last_refresh_utc ? st.last_refresh_utc.slice(0, 16) + " UTC" : "لسه";
   document.getElementById("feedStatus").textContent = st.total_jobs
-    ? `${st.total_jobs} وظيفة من ${st.job_sources.length} مصادر، و${st.total_courses} كورس مجاني. آخر تحديث: ${when}. بيتحدث تلقائيًا كل 24 ساعة.`
-    : (st.refreshing ? "بنحمّل وظائف النهارده من المصادر... استنى دقيقة وحدّث الصفحة." : "جاري التحضير...");
-  const chips = ['<span class="chip" data-s="" style="cursor:pointer">الكل</span>']
-    .concat(st.job_sources.map((s) => `<span class="chip" data-s="${esc(s.source)}" style="cursor:pointer">${esc(s.name)} (${s.count})</span>`));
-  const box = document.getElementById("feedSources");
-  box.innerHTML = chips.join("");
-  const mark = () => box.querySelectorAll(".chip").forEach((c) => c.classList.toggle("have", c.dataset.s === feedState.source));
-  box.onclick = (e) => {
-    if (e.target.dataset && e.target.dataset.s !== undefined) {
-      feedState.source = e.target.dataset.s; mark(); loadFeed(false);
-    }
+    ? `${st.total_jobs} وظيفة (${st.egypt_jobs} في مصر) و${st.total_courses} كورس مجاني. آخر تحديث: ${when}`
+    : (st.refreshing ? "بنحمّل الوظائف... استنى دقيقة وحدّث الصفحة." : "جاري التحضير...");
+  drawFilters();
+  document.getElementById("feedCountry").onclick = (e) => {
+    if (e.target.dataset.c !== undefined) { feedState.country = e.target.dataset.c; drawFilters(); loadFeed(false); }
   };
-  mark();
+  document.getElementById("feedFields").onclick = (e) => {
+    if (e.target.dataset.f !== undefined) { feedState.field = e.target.dataset.f; drawFilters(); loadFeed(false); }
+  };
+  document.getElementById("feedTabs").onclick = (e) => {
+    if (e.target.dataset.t) { feedState.tab = e.target.dataset.t; feedState.field = ""; drawFilters(); loadFeed(false); }
+  };
   document.getElementById("feedSourcesInfo").innerHTML =
     "<ul>" + st.job_sources.concat(st.course_sources).map((s) =>
       `<li><a href="${esc(s.site)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${s.count})${s.note ? " - " + esc(s.note) : ""}</li>`).join("") +
-    "</ul><p>الوظائف دي من مصادر عامة بتسمح بالاستخدام، ومش من Wuzzuf أو LinkedIn لأنهم مفيهمش واجهة مجانية رسمية. معظمها ريموت وبيقبل من مصر، لكن اقرأ شرط الموقع قبل التقديم. بيانات الخدمة المجانية بتتحمّل من جديد مع كل تشغيل.</p>";
+    "</ul><p>أغلب الوظائف جوه مصر. أي وظيفة بتفضل في القائمة طول ما هي مفتوحة في موقعها الأصلي، وبتتشال أول ما تتقفل أو تنتهي. القائمة بتتجدد تلقائيًا كل 24 ساعة. التقديم دايمًا من صفحة الوظيفة الأصلية.</p>";
   let timer;
   document.getElementById("feedQ").oninput = () => { clearTimeout(timer); timer = setTimeout(() => loadFeed(false), 350); };
   document.getElementById("feedSort").onchange = () => loadFeed(false);
@@ -460,15 +484,17 @@ async function showFeedDetail(id) {
     <div class="card">
       <h2>${esc(j.title)}</h2>
       <p class="muted">${esc(j.company)} · ${esc(j.location)}${j.posted_at ? " · " + esc(j.posted_at) : ""} · المصدر: <a href="${esc(j.source_site)}" target="_blank" rel="noopener">${esc(j.source_name)}</a></p>
-      <p>نسبة التطابق: <b>${j.match_pct}%</b></p>${matchBar(j.match_pct)}
+      <p><span class="chip">${esc(j.field_label)}</span></p>
+      ${j.n_skills ? `<p>نسبة التطابق: <b>${j.match_pct}%</b></p>${matchBar(j.match_pct)}
       <h4>مهاراتك المطابقة</h4><div class="chips">${have}</div>
-      <h4>المهارات الناقصة</h4><div class="chips">${j.missing.map((s) => skillChip(s, "missing")).join("") || "مفيش، أنت جاهز ✅"}</div>
-      <p>${esc(j.description).slice(0, 700)}...</p>
+      <h4>المهارات الناقصة</h4><div class="chips">${j.missing.map((s) => skillChip(s, "missing")).join("") || "مفيش، أنت جاهز ✅"}</div>`
+      : '<p class="muted">الوظيفة دي مش من مجال المهارات التقنية اللي النظام بيحللها، اقرأ الوصف وقدّم من الرابط.</p>'}
+      <p class="desc">${esc(j.description).slice(0, 1200)}...</p>
     </div>
     <h3>١) الكورسات المجانية اللي تسد الفجوة</h3>
-    ${steps || "<p>أنت مغطي كل مهارات الوظيفة دي.</p>"}
+    ${steps || (j.n_skills ? "<p>أنت مغطي كل مهارات الوظيفة دي.</p>" : "")}
     <h3>٢) قدّم على الوظيفة</h3>
-    <p><a class="btn primary" href="${esc(j.apply_url)}" target="_blank" rel="noopener">قدّم على ${esc(j.source_name)} ↗</a></p>`;
+    <div class="applybar"><a class="btn primary block" href="${esc(j.apply_url)}" target="_blank" rel="noopener">قدّم على الوظيفة ↗</a></div>`;
 }
 
 /* ---------- router ---------- */
