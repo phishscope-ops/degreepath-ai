@@ -196,3 +196,7 @@ img, table { max-width: 100%; }
   .applybar { position: static; background: none; border: 0; padding: 0; }
   .btn.block { display: inline-block; width: auto; }
 }
+
+.stage-title { margin: 18px 0 8px; color: #4f46e5; }
+a.btn { display: inline-block; text-decoration: none; margin-top: 8px; }
+#careerCats { margin: 8px 0 12px; }

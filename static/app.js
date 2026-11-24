@@ -20,6 +20,21 @@ function clearAuth() {
   state.user = null;
   localStorage.removeItem("dp_token");
   localStorage.removeItem("dp_user");
+  Object.keys(localStorage).forEach((k) => { if (k.startsWith("dpc:")) localStorage.removeItem(k); });
+}
+
+// Stale-while-revalidate: paint the last saved copy instantly, then refresh it.
+async function swr(path, nav, paint) {
+  const key = "dpc:" + (state.user ? state.user.id : "x") + ":" + path;
+  let old = null;
+  try { old = JSON.parse(localStorage.getItem(key)); } catch (_) {}
+  if (old) paint(old);
+  let fresh;
+  try { fresh = await api(path); } catch (err) { if (old) return; throw err; }
+  alive(nav);
+  const txt = JSON.stringify(fresh);
+  if (!old || txt !== JSON.stringify(old)) paint(fresh);
+  try { localStorage.setItem(key, txt); } catch (_) {}
 }
 
 async function api(path, opts = {}) {
@@ -273,24 +288,76 @@ async function showCourses() {
   await refresh();
 }
 
+const careerState = { cat: "" };
+
+function careerCard(c) {
+  return `
+    <div class="card job-card" onclick="location.hash='#/careers/${c.id}'">
+      <h4>${esc(c.title_ar || c.title)}</h4>
+      <div class="cat">${esc(c.title)}</div>
+      <div class="chips">${c.top_skills.map((n) => `<span class="chip">${esc(n)}</span>`).join("")}${
+        c.n_skills > c.top_skills.length ? `<span class="chip">+${c.n_skills - c.top_skills.length}</span>` : ""
+      }</div>
+      <div class="muted">🗺️ شوف خطة التعلم (${c.n_skills} مهارة)</div>
+    </div>`;
+}
+
 async function showJobs() {
   showNav("jobs");
   const nav = render("tpl-jobs");
-  const data = await api("/jobs");
-  alive(nav);
-  document.getElementById("jobsList").innerHTML = data.jobs
-    .map(
-      (j) => `
-    <div class="card job-card" onclick="location.hash='#/jobs/${j.id}'">
-      <h4>${esc(j.title_ar || j.title)}</h4>
-      <div class="cat">${esc(j.title)}</div>
-      <p class="muted">${esc(j.description).slice(0, 120)}...</p>
-      <div class="chips">${j.required_skills.slice(0, 4).map((s) => skillChip(s)).join("")}${
-        j.required_skills.length > 4 ? `<span class="chip">+${j.required_skills.length - 4}</span>` : ""
-      }</div>
-    </div>`
-    )
-    .join("");
+  const draw = (data) => {
+    const bar = document.getElementById("careerCats");
+    const list = document.getElementById("careersList");
+    if (!bar || !list) return;
+    bar.innerHTML =
+      `<button class="chipb${careerState.cat === "" ? " on" : ""}" data-k="">الكل (${data.careers.length})</button>` +
+      data.categories.map((c) => `<button class="chipb${careerState.cat === c.key ? " on" : ""}" data-k="${esc(c.key)}">${esc(c.label)} (${c.count})</button>`).join("");
+    bar.onclick = (e) => {
+      if (e.target.dataset.k !== undefined) { careerState.cat = e.target.dataset.k; draw(data); }
+    };
+    list.innerHTML = data.careers.filter((c) => !careerState.cat || c.category === careerState.cat).map(careerCard).join("");
+  };
+  // personalised block loads after the careers are on screen
+  api("/matches").then((m) => {
+    if (nav !== navId) return;
+    const el = document.getElementById("topMatches");
+    if (!el) return;
+    const mine = m.matches.slice(0, 6);
+    el.innerHTML = mine.map((x) => `
+      <div class="card job-card" onclick="location.hash='#/jobs/${x.job_id}'">
+        <h4>${esc(x.title_ar || x.title)}</h4>
+        ${matchBar(x.match_pct)}
+        <div><span class="match-pct">${Math.round(x.match_pct)}%</span> تطابق مع مهاراتك</div>
+      </div>`).join("");
+  }).catch(() => {});
+  await swr("/careers", nav, draw);
+}
+
+async function showCareer(jobId) {
+  showNav("jobs");
+  const nav = render("tpl-career");
+  await swr("/careers/" + jobId, nav, (r) => {
+    const el = document.getElementById("careerDetail");
+    if (!el) return;
+    const j = r.job;
+    el.innerHTML = `
+      <h2>${esc(j.title_ar || j.title)}</h2>
+      <div class="muted">${esc(j.title)} - ${esc(j.category_label || "")}</div>
+      <div class="card"><p>${esc(j.description)}</p>
+        <a class="btn primary" href="#/jobs/${j.id}">حلل فجوتي مع المسار ده</a></div>
+      <h3>خطة التعلم الكاملة (Roadmap) - ${r.total_skills} مهارة</h3>
+      ${r.stages.map((st) => `
+        <h4 class="stage-title">${esc(st.label)}</h4>
+        <div class="roadmap">${st.skills.map((sk) => `
+          <div class="roadmap-step">
+            <div class="step-title">${sk.step}. ${esc(sk.skill_ar || sk.skill)}
+              <span class="muted">(${esc(sk.skill)})</span>
+              ${sk.have ? '<span class="badge">✔ عندك</span>' : ""}</div>
+            ${sk.resources.length
+              ? `<ul>${sk.resources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="badge">${esc(x.kind)}</span></li>`).join("")}</ul>`
+              : '<p class="muted">ابحث عن كورس مجاني في المهارة دي.</p>'}
+          </div>`).join("")}</div>`).join("")}`;
+  });
 }
 
 async function showJobDetail(jobId) {
@@ -545,6 +612,13 @@ async function route() {
     try { await showFeedDetail(parts[1]); } catch (err) {
       if (err instanceof Stale || seq !== routeSeq) return;
       app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
+    }
+    return;
+  }
+  if (page === "careers" && parts[1]) {
+    try { await showCareer(parts[1]); } catch (err) {
+      if (err instanceof Stale || seq !== routeSeq) return;
+      if (state.token) app.innerHTML = `<div class="page"><div class="card"><p class="error">${esc(err.message)}</p></div></div>`;
     }
     return;
   }

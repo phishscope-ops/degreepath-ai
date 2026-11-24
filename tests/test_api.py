@@ -242,3 +242,30 @@ def test_expired_session_rejected(client):
         db.execute("UPDATE sessions SET created_at = datetime('now', '-50000 minutes')")
         db.commit()
     assert client.get("/api/me", headers=h).status_code == 401
+
+
+def test_careers_list_and_full_roadmap(client):
+    h = auth_headers(client)
+    data = client.get("/api/careers", headers=h).get_json()
+    assert len(data["careers"]) >= 30
+    assert sum(c["count"] for c in data["categories"]) == len(data["careers"])
+    assert all(c["label"] for c in data["categories"])
+    da = next(c for c in data["careers"] if c["title"] == "Data Analyst")
+    r = client.get("/api/careers/%d" % da["id"], headers=h).get_json()
+    assert r["total_skills"] == da["n_skills"] > 0
+    steps = [s["step"] for st in r["stages"] for s in st["skills"]]
+    assert steps == list(range(1, len(steps) + 1))
+    assert not any(s["have"] for st in r["stages"] for s in st["skills"])
+    client.post("/api/courses", json={"title": "SQL", "description": "SQL databases"}, headers=h)
+    r2 = client.get("/api/careers/%d" % da["id"], headers=h).get_json()
+    assert any(s["have"] for st in r2["stages"] for s in st["skills"])
+    assert client.get("/api/careers/99999", headers=h).status_code == 404
+    assert client.get("/api/careers").status_code == 401
+
+
+def test_gzip_and_versioned_cache(client):
+    r = client.get("/app.js?v=1.7.0", headers={"Accept-Encoding": "gzip"})
+    assert r.headers["Content-Encoding"] == "gzip"
+    assert "immutable" in r.headers["Cache-Control"]
+    r = client.get("/", headers={"Accept-Encoding": "gzip"})
+    assert r.headers["Cache-Control"] == "no-cache"

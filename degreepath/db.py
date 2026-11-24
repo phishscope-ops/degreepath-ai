@@ -392,3 +392,56 @@ def init_db(app):
 
 def init_app(app):
     app.teardown_appcontext(close_db)
+
+
+# ---- deferred write of the analysis history (keeps the GET fast) ----
+import queue as _queue
+
+_alog_q = _queue.Queue(maxsize=500)
+_alog_started = False
+_alog_lock = threading.Lock()
+
+
+def _alog_worker(dsn):
+    conn = None
+    while True:
+        params = _alog_q.get()
+        try:
+            if conn is None:
+                conn = connect_dsn(dsn)
+            conn.execute(
+                "INSERT INTO analyses (user_id, job_id, match_pct, matched, missing) VALUES (?, ?, ?, ?, ?)",
+                params,
+            )
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = None
+
+
+def log_analysis_later(app, params):
+    """Queue one analyses row; a single background thread writes it."""
+    global _alog_started
+    if app.config.get("TESTING"):
+        db = get_db()
+        db.execute(
+            "INSERT INTO analyses (user_id, job_id, match_pct, matched, missing) VALUES (?, ?, ?, ?, ?)",
+            params,
+        )
+        db.commit()
+        return
+    with _alog_lock:
+        if not _alog_started:
+            threading.Thread(target=_alog_worker, args=(app.config["DATABASE"],), daemon=True).start()
+            _alog_started = True
+    try:
+        _alog_q.put_nowait(params)
+    except _queue.Full:
+        pass

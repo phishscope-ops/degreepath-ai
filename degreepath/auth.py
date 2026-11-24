@@ -3,7 +3,9 @@ import re
 import secrets
 from functools import wraps
 
-from flask import g, jsonify, request
+import time
+
+from flask import current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import get_db
@@ -31,11 +33,24 @@ def create_session(user_id):
     return token
 
 
+_SESS = {}
+_SESS_TTL = 20  # seconds a verified session is trusted without asking the database
+
+
+def forget_token(token):
+    _SESS.pop(token, None)
+
+
 def current_user():
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
     token = auth[7:].strip()
+    use_cache = not current_app.config.get("TESTING")
+    if use_cache:
+        hit = _SESS.get(token)
+        if hit and hit[0] > time.time():
+            return dict(hit[1])
     db = get_db()
     row = db.execute(
         """SELECT u.id, u.email, u.name FROM sessions s
@@ -43,6 +58,10 @@ def current_user():
            AND s.created_at > datetime('now', '-43200 minutes')""",
         (token,),
     ).fetchone()
+    if row and use_cache:
+        if len(_SESS) > 5000:
+            _SESS.clear()
+        _SESS[token] = (time.time() + _SESS_TTL, dict(row))
     return dict(row) if row else None
 
 

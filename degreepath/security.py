@@ -79,6 +79,36 @@ def purge_old():
     db.commit()
 
 
+_GZ = {}
+
+
+def _gzip(resp):
+    """Compress text responses (the 1.3 MB-free JSON/JS/CSS go over slow mobile links)."""
+    import gzip
+    if resp.status_code != 200 or "gzip" not in request.headers.get("Accept-Encoding", ""):
+        return
+    if resp.headers.get("Content-Encoding") or resp.mimetype not in (
+            "application/json", "text/html", "text/css", "text/javascript",
+            "application/javascript"):
+        return
+    if resp.direct_passthrough:
+        key = (request.path, resp.headers.get("ETag"))
+        gz = _GZ.get(key)
+        if gz is None:
+            resp.direct_passthrough = False
+            raw = resp.get_data()
+            gz = gzip.compress(raw, 6)
+            _GZ[key] = gz
+        resp.set_data(gz)
+    else:
+        raw = resp.get_data()
+        if len(raw) < 700:
+            return
+        resp.set_data(gzip.compress(raw, 5))
+    resp.headers["Content-Encoding"] = "gzip"
+    resp.headers.add("Vary", "Accept-Encoding")
+
+
 def add_headers(resp):
     h = resp.headers
     h.setdefault("X-Content-Type-Options", "nosniff")
@@ -88,6 +118,13 @@ def add_headers(resp):
     h.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     if request.path.startswith("/api/") or request.path == "/admin":
         h["Cache-Control"] = "no-store"
+    elif request.path.endswith((".js", ".css")) and request.args.get("v"):
+        # versioned URL (?v=x.y.z): safe to keep for a year, index.html changes the version
+        h["Cache-Control"] = "public, max-age=31536000, immutable"
     elif request.path == "/" or request.path.endswith((".js", ".css", ".html")):
         h["Cache-Control"] = "no-cache"
+    try:
+        _gzip(resp)
+    except Exception:
+        pass
     return resp

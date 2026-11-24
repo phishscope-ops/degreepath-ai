@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
 <title>مسارك - طريقك من الدراسة للوظيفة</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=1.7.0">
 </head>
 <body>
 <nav id="navbar" class="hidden">
@@ -93,8 +93,19 @@
 
 <template id="tpl-jobs">
   <div class="page">
-    <h2>الوظائف المتاحة في النظام</h2>
-    <div id="jobsList" class="grid"></div>
+    <h2>كل المسارات الوظيفية</h2>
+    <p class="muted">اختار أي مسار (فرونت إند، باك إند، ذكاء اصطناعي...) وهتلاقي خطة التعلم الكاملة بالترتيب.</p>
+    <div class="chiprow" id="careerCats"></div>
+    <div id="careersList" class="grid"></div>
+    <h3>الأنسب لمهاراتك</h3>
+    <div id="topMatches" class="grid"></div>
+  </div>
+</template>
+
+<template id="tpl-career">
+  <div class="page">
+    <a href="#/jobs" class="back-link">→ رجوع للمسارات</a>
+    <div id="careerDetail"></div>
   </div>
 </template>
 
@@ -154,6 +165,6 @@
   </div>
 </template>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=1.7.0"></script>
 </body>
 </html>

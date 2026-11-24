@@ -12,7 +12,7 @@ from .auth import (
     register_user,
     validate_credentials,
 )
-from .db import get_db, is_unique_violation
+from .db import get_db, is_unique_violation, log_analysis_later
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 _DUMMY_HASH = generate_password_hash("dummy-password-for-timing")
@@ -64,6 +64,8 @@ def login():
 @login_required
 def logout():
     auth = request.headers.get("Authorization", "")
+    from .auth import forget_token
+    forget_token(auth[7:].strip())
     get_db().execute("DELETE FROM sessions WHERE token = ?", (auth[7:].strip(),))
     get_db().commit()
     return jsonify({"ok": True})
@@ -246,43 +248,79 @@ def extract_preview():
     )
 
 
+CATEGORY_LABELS = {
+    "web": "تطوير الويب", "software": "هندسة البرمجيات", "mobile": "تطبيقات الموبايل",
+    "data": "البيانات", "ai": "الذكاء الاصطناعي", "security": "الأمن السيبراني",
+    "cloud": "السحابة و DevOps", "it": "الدعم الفني والشبكات", "business": "الأعمال والتحليل",
+    "design": "التصميم", "databases": "قواعد البيانات", "games": "الألعاب", "web3": "بلوك تشين",
+}
+
+
+def _job_skill_list(cat, job_id):
+    out = []
+    for r in cat["reqs"].get(job_id, []):
+        sk = cat["smap"].get(r["skill_id"])
+        if sk:
+            out.append({"id": r["skill_id"], "name": sk["name"], "name_ar": sk["name_ar"],
+                        "importance": r["importance"]})
+    return out
+
+
 @bp.get("/jobs")
 @login_required
 def list_jobs():
-    db = get_db()
-    jobs = db.execute("SELECT id, title, title_ar, category, description FROM jobs").fetchall()
-    rows = db.execute(
-        """SELECT js.job_id, s.id, s.name, s.name_ar, js.importance FROM job_skills js
-           JOIN skills s ON s.id = js.skill_id
-           ORDER BY js.importance DESC, s.name"""
-    ).fetchall()
-    by_job = {}
-    for r in rows:
-        by_job.setdefault(r["job_id"], []).append(
-            {"id": r["id"], "name": r["name"], "name_ar": r["name_ar"], "importance": r["importance"]})
+    cat = matching.catalog(get_db())
     out = []
-    for j in jobs:
+    for j in cat["jobs"]:
         d = dict(j)
-        d["required_skills"] = by_job.get(j["id"], [])
+        d["required_skills"] = _job_skill_list(cat, j["id"])
         out.append(d)
     return jsonify({"jobs": out})
+
+
+@bp.get("/careers")
+@login_required
+def list_careers():
+    """Every career track in the system (no personalization), grouped by category."""
+    cat = matching.catalog(get_db())
+    careers = []
+    for j in cat["jobs"]:
+        sk = _job_skill_list(cat, j["id"])
+        careers.append({
+            "id": j["id"], "title": j["title"], "title_ar": j["title_ar"],
+            "category": j["category"], "description": j["description"],
+            "n_skills": len(sk), "top_skills": [s["name"] for s in sk[:4]],
+        })
+    seen = []
+    for c in careers:
+        if c["category"] not in seen:
+            seen.append(c["category"])
+    cats = [{"key": k, "label": CATEGORY_LABELS.get(k, k),
+             "count": sum(1 for c in careers if c["category"] == k)} for k in seen]
+    return jsonify({"careers": careers, "categories": cats})
+
+
+@bp.get("/careers/<int:job_id>")
+@login_required
+def career_detail(job_id):
+    db = get_db()
+    r = matching.full_roadmap(db, job_id, matching.student_skill_ids(db, g.user["id"]))
+    if r is None:
+        return jsonify({"error": "الوظيفة غير موجودة"}), 404
+    r["job"]["category_label"] = CATEGORY_LABELS.get(r["job"]["category"], r["job"]["category"])
+    return jsonify(r)
 
 
 @bp.get("/jobs/<int:job_id>")
 @login_required
 def job_detail(job_id):
     db = get_db()
-    j = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    cat = matching.catalog(db)
+    j = cat["jobs_by_id"].get(job_id)
     if j is None:
         return jsonify({"error": "الوظيفة غير موجودة"}), 404
-    reqs = db.execute(
-        """SELECT s.id, s.name, s.name_ar, js.importance FROM job_skills js
-           JOIN skills s ON s.id = js.skill_id
-           WHERE js.job_id = ? ORDER BY js.importance DESC, s.name""",
-        (job_id,),
-    ).fetchall()
     d = dict(j)
-    d["required_skills"] = [dict(r) for r in reqs]
+    d["required_skills"] = _job_skill_list(cat, job_id)
     return jsonify({"job": d})
 
 
@@ -297,23 +335,19 @@ def matches():
 @login_required
 def analysis(job_id):
     db = get_db()
-    j = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    cat = matching.catalog(db)
+    j = cat["jobs_by_id"].get(job_id)
     if j is None:
         return jsonify({"error": "الوظيفة غير موجودة"}), 404
     user_skills = matching.student_skill_ids(db, g.user["id"])
-    m = matching.match_job(db, user_skills, job_id)
+    m = matching.match_job(db, user_skills, job_id, cat["reqs"].get(job_id, []), cat["smap"])
     roadmap = matching.build_roadmap(db, user_skills, job_id)
-    db.execute(
-        "INSERT INTO analyses (user_id, job_id, match_pct, matched, missing) VALUES (?, ?, ?, ?, ?)",
-        (
-            g.user["id"],
-            job_id,
-            m["match_pct"],
-            json.dumps([e["skill_id"] for e in m["matched"]]),
-            json.dumps([e["skill_id"] for e in m["missing"]]),
-        ),
-    )
-    db.commit()
+    # the history row is written after the response is sent (saves 2 DB round trips)
+    log_analysis_later(
+        current_app._get_current_object(),
+        (g.user["id"], job_id, m["match_pct"],
+         json.dumps([e["skill_id"] for e in m["matched"]]),
+         json.dumps([e["skill_id"] for e in m["missing"]])))
     return jsonify(
         {
             "job": {"id": j["id"], "title": j["title"], "title_ar": j["title_ar"]},
@@ -327,13 +361,33 @@ def analysis(job_id):
 
 # ---------------------------------------------------------------- live feed
 
+_QC = {}
+_QC_TTL = 120  # the live feed only changes on its daily refresh
+
+
+def _cached_rows(db, sql, args=()):
+    """Run a read query through a 2-minute in-process cache (saves DB round trips)."""
+    import time
+    if current_app.config.get("TESTING"):
+        return db.execute(sql, args).fetchall()
+    key = (sql, tuple(args))
+    hit = _QC.get(key)
+    if hit and time.time() - hit[0] < _QC_TTL:
+        return hit[1]
+    rows = [dict(r) for r in db.execute(sql, args).fetchall()]
+    if len(_QC) > 300:
+        _QC.clear()
+    _QC[key] = (time.time(), rows)
+    return rows
+
+
 def _feed_reqs_map(db):
     m = {}
-    for r in db.execute(
+    for r in _cached_rows(db, 
         """SELECT js.job_id AS job_id, s.id AS id, s.name AS name, s.name_ar AS name_ar, js.importance AS importance
            FROM live_job_skills js JOIN skills s ON s.id = js.skill_id
            ORDER BY js.importance DESC, s.name"""
-    ).fetchall():
+    ):
         m.setdefault(r["job_id"], []).append(
             {"id": r["id"], "name": r["name"], "name_ar": r["name_ar"], "importance": r["importance"]})
     return m
@@ -450,7 +504,7 @@ def feed_jobs():
     if where:
         sql += " WHERE " + " AND ".join(where)
     reqs_map = _feed_reqs_map(db)
-    rows = [_feed_job_row(db, j, user_skills, reqs_map) for j in db.execute(sql, args).fetchall()]
+    rows = [_feed_job_row(db, j, user_skills, reqs_map) for j in _cached_rows(db, sql, args)]
     if sort == "new":
         rows.sort(key=lambda r: r["posted_at"] or "", reverse=True)
     else:
@@ -499,10 +553,10 @@ def feed_courses():
         where.append("source = ?")
         args.append(source)
     w = (" WHERE " + " AND ".join(where)) if where else ""
-    total = db.execute("SELECT COUNT(*) AS n FROM live_courses" + w, args).fetchone()["n"]
-    rows = db.execute(
+    total = _cached_rows(db, "SELECT COUNT(*) AS n FROM live_courses" + w, args)[0]["n"]
+    rows = _cached_rows(db,
         "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses" + w
-        + " ORDER BY (source='coursera') DESC, id LIMIT ? OFFSET ?", args + [limit, offset]).fetchall()
+        + " ORDER BY (source='coursera') DESC, id LIMIT ? OFFSET ?", args + [limit, offset])
     out = []
     for r in rows:
         info = feed.SOURCE_INFO.get(r["source"], {})
