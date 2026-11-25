@@ -561,10 +561,11 @@ def is_stale(db):
 def refresh_in_background(app):
     """Start a refresh thread unless one is already running."""
     global _running
+    dsn = app.config["DATABASE"]  # resolve now: `app` may be the current_app proxy, unusable in the thread
     with _lock:
         if _running:
             return False
-        run_id = claim_run(app.config["DATABASE"])
+        run_id = claim_run(dsn)
         if run_id is None:
             return False
         _running = True
@@ -572,12 +573,12 @@ def refresh_in_background(app):
     def work():
         global _running
         try:
-            refresh(app.config["DATABASE"], run_id)
+            refresh(dsn, run_id)
             _log("refresh finished")
         except Exception:
             _log("refresh crashed: " + traceback.format_exc()[-600:])
             try:
-                d = _connect(app.config["DATABASE"])
+                d = _connect(dsn)
                 d.execute("UPDATE feed_runs SET finished_at=?, report=? WHERE id=?",
                           (_now(), json.dumps({"error": "crashed"}), run_id))
                 d.commit()
@@ -638,6 +639,7 @@ def ensure_extras(app, db):
     """Arabic list (tiny, static) is stored right away; the paid Coursera group runs in a
     background thread. Both run on their own, so a slow full refresh never blocks them."""
     global _extras_running
+    dsn = app.config["DATABASE"]
     try:
         have = {r["source"]: r["c"] for r in db.execute(
             "SELECT source, COUNT(*) AS c FROM live_courses WHERE source IN ('arabic','coursera') GROUP BY source")}
@@ -660,9 +662,9 @@ def ensure_extras(app, db):
         global _extras_running
         try:
             if need_ar:
-                _run_extra_source(app.config["DATABASE"], "arabic")
+                _run_extra_source(dsn, "arabic")
             if need_pa:
-                _run_extra_source(app.config["DATABASE"], "coursera")
+                _run_extra_source(dsn, "coursera")
         finally:
             with _extras_lock:
                 _extras_running = False

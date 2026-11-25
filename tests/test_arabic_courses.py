@@ -58,3 +58,22 @@ def test_arabic_search_hits_python_playlist(app):
     h = {"Authorization": "Bearer " + r.get_json()["token"]}
     res = c.get("/api/feed/courses?q=بايثون&source=arabic", headers=h).get_json()
     assert res["total"] >= 2
+
+
+def test_background_refresh_works_with_current_app_proxy(app, monkeypatch):
+    """Regression: api.py passes the current_app proxy; the thread must not touch it."""
+    import threading
+    from flask import current_app
+    seen = {}
+    done = threading.Event()
+
+    def fake_refresh(dsn, run_id):
+        seen["dsn"] = dsn
+        done.set()
+        return {}
+
+    monkeypatch.setattr(feed, "refresh", fake_refresh)
+    monkeypatch.setattr(feed, "_running", False)
+    with app.app_context():
+        assert feed.refresh_in_background(current_app) is True
+    assert done.wait(10) and seen["dsn"] == app.config["DATABASE"]
