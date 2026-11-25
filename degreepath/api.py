@@ -524,6 +524,8 @@ def _feed_status():
         ],
         "total_courses": db.execute(
             "SELECT COUNT(*) AS n FROM live_courses WHERE COALESCE(pricing,'free')='free'").fetchone()["n"],
+        "arabic_courses": db.execute(
+            "SELECT COUNT(*) AS n FROM live_courses WHERE source='arabic'").fetchone()["n"],
         "paid_courses": db.execute(
             "SELECT COUNT(*) AS n FROM live_courses WHERE pricing='paid'").fetchone()["n"],
         "last_report": last,
@@ -615,7 +617,7 @@ def feed_courses():
         args.append(source)
     rows = _cached_rows(db,
         "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses WHERE "
-        + " AND ".join(where) + " ORDER BY id", args)
+        + " AND ".join(where) + " ORDER BY CASE WHEN source = 'arabic' THEN 0 ELSE 1 END, id", args)
     groups = arsearch.parse(q)
     if groups:
         rows = [r for r in rows if arsearch.matches(groups, r["title"], r["summary"])]

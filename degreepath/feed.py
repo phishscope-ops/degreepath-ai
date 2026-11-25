@@ -15,8 +15,10 @@ cannot be fetched again.
 import html
 import json
 import re
+import sys
 import threading
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -25,6 +27,10 @@ from . import nlp
 
 UA = {"User-Agent": "DegreePathAI/1.2 (student graduation project; daily fetch)"}
 TIMEOUT = 40
+
+
+def _log(msg):
+    print("[feed] " + msg, file=sys.stderr, flush=True)
 STALE_HOURS = 24
 JOB_CAPS = {"workable": 220, "arbeitnow": 30, "jobicy": 20, "himalayas": 15,
             "remoteok": 10, "remotive": 5}          # ~300 open jobs, ~3/4 in Egypt
@@ -54,6 +60,8 @@ SOURCE_INFO = {
     "curated": {"name": "مصادر مجانية مختارة", "kind": "course", "site": "https://www.freecodecamp.org/",
                 "note": "مصادر مجانية من الأول للآخر (freeCodeCamp, Kaggle, Khan Academy, Google وغيرها)",
                 "pricing": "free"},
+    "arabic": {"name": "بالعربي (يوتيوب ومنصات عربية)", "kind": "course", "site": "https://www.youtube.com/",
+               "note": "قوائم تشغيل ومنصات عربية مجانية بالكامل", "pricing": "free"},
     "coursera": {"name": "Coursera", "kind": "course", "site": "https://www.coursera.org/",
                  "note": "تجربة مجانية 7 أيام ثم اشتراك مدفوع (بعض الكورسات ليها خيار مراجعة مجاني، اتأكد في صفحة الكورس)",
                  "pricing": "paid"},
@@ -281,7 +289,16 @@ def fetch_coursera():
     return out
 
 
-COURSE_FETCHERS = {"mslearn": fetch_mslearn, "curated": fetch_curated, "coursera": fetch_coursera}
+def fetch_arabic():
+    """Arabic free courses: YouTube playlists and Arabic platforms (static list, no API key)."""
+    import hashlib
+    from .arabic_courses import ARABIC_COURSES
+    return [dict(ext_id=hashlib.sha1(c["url"].encode()).hexdigest()[:16], title=c["title"][:200],
+                 summary=c["summary"], url=c["url"], level="", duration_min=0) for c in ARABIC_COURSES]
+
+
+COURSE_FETCHERS = {"mslearn": fetch_mslearn, "curated": fetch_curated, "arabic": fetch_arabic,
+                   "coursera": fetch_coursera}
 
 
 # ------------------------------------------------------------------ refresh
@@ -364,6 +381,42 @@ def _pick_jobs(db, src, items, alias_index):
     return keep
 
 
+def _ingest_courses(db, src, items, alias_index, started):
+    stored, extra, listed = 0, 0, set()
+    for it in items:
+        ids = nlp.extract_skills(f"{it['title']} {it['summary']}", alias_index)
+        if not ids and src not in ("curated", "arabic"):
+            if extra >= EXTRA_COURSES or src != "coursera":
+                continue
+            extra += 1
+        fld = classify_field(it["title"], it["summary"][:200])
+        listed.add(it["ext_id"])
+        db.execute(
+            """INSERT INTO live_courses (source, ext_id, title, summary, url, level,
+               duration_min, fetched_at, field, pricing) VALUES (?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(source, ext_id) DO UPDATE SET title=excluded.title,
+               summary=excluded.summary, url=excluded.url, level=excluded.level,
+               duration_min=excluded.duration_min, fetched_at=excluded.fetched_at,
+               field=excluded.field, pricing=excluded.pricing""",
+            (src, it["ext_id"], it["title"][:200], it["summary"], it["url"],
+             it["level"], it["duration_min"], _now(), fld,
+             SOURCE_INFO.get(src, {}).get("pricing", "free")),
+        )
+        cid = db.execute("SELECT id FROM live_courses WHERE source=? AND ext_id=?",
+                         (src, it["ext_id"])).fetchone()["id"]
+        db.execute("DELETE FROM live_course_skills WHERE course_id=?", (cid,))
+        for sid in ids:
+            db.execute("INSERT INTO live_course_skills (course_id, skill_id) VALUES (?,?)",
+                       (cid, sid))
+        stored += 1
+        if stored % 100 == 0:
+            db.commit()
+    # courses no longer in the catalog are gone
+    db.execute("DELETE FROM live_courses WHERE source=? AND fetched_at < ?", (src, started))
+    db.commit()
+    return stored
+
+
 def refresh(db_path, run_id=None):
     """Fetch every source, store jobs/courses, tag them with skills. Returns a report.
 
@@ -373,12 +426,23 @@ def refresh(db_path, run_id=None):
     started = _now()
     report = {"started_at": started, "sources": {}}
     db = _connect(db_path)
+    try:
+        db.execute("SET lock_timeout = '20s'")
+        db.execute("SET statement_timeout = '90s'")
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    _log("refresh start")
     if run_id is None:
         run_id = db.execute("INSERT INTO feed_runs (started_at) VALUES (?)", (started,)).lastrowid
         db.commit()
     alias_index = nlp.build_alias_index(db)
 
     for src, fn in JOB_FETCHERS.items():
+        _log("jobs source " + src)
         try:
             items = fn()
             if not items:
@@ -442,45 +506,17 @@ def refresh(db_path, run_id=None):
             report["sources"][src] = {"ok": False, "error": str(e)[:200]}
 
     for src, fn in COURSE_FETCHERS.items():
+        _log("courses source " + src)
         try:
             items = fn()
             if not items:
                 raise RuntimeError("source returned no courses, keeping stored ones")
-            stored, extra, listed = 0, 0, set()
-            for it in items:
-                ids = nlp.extract_skills(f"{it['title']} {it['summary']}", alias_index)
-                if not ids and src != "curated":
-                    if extra >= EXTRA_COURSES or src != "coursera":
-                        continue
-                    extra += 1
-                fld = classify_field(it["title"], it["summary"][:200])
-                listed.add(it["ext_id"])
-                db.execute(
-                    """INSERT INTO live_courses (source, ext_id, title, summary, url, level,
-                       duration_min, fetched_at, field, pricing) VALUES (?,?,?,?,?,?,?,?,?,?)
-                       ON CONFLICT(source, ext_id) DO UPDATE SET title=excluded.title,
-                       summary=excluded.summary, url=excluded.url, level=excluded.level,
-                       duration_min=excluded.duration_min, fetched_at=excluded.fetched_at,
-                       field=excluded.field, pricing=excluded.pricing""",
-                    (src, it["ext_id"], it["title"][:200], it["summary"], it["url"],
-                     it["level"], it["duration_min"], _now(), fld,
-                     SOURCE_INFO.get(src, {}).get("pricing", "free")),
-                )
-                cid = db.execute("SELECT id FROM live_courses WHERE source=? AND ext_id=?",
-                                 (src, it["ext_id"])).fetchone()["id"]
-                db.execute("DELETE FROM live_course_skills WHERE course_id=?", (cid,))
-                for sid in ids:
-                    db.execute("INSERT INTO live_course_skills (course_id, skill_id) VALUES (?,?)",
-                               (cid, sid))
-                stored += 1
-                if stored % 100 == 0:
-                    db.commit()
-            # courses no longer in the catalog are gone
-            db.execute("DELETE FROM live_courses WHERE source=? AND fetched_at < ?", (src, started))
-            db.commit()
+            stored = _ingest_courses(db, src, items, alias_index, started)
             report["sources"][src] = {"ok": True, "fetched": len(items), "stored": stored}
+            _log("courses %s ok fetched=%d stored=%d" % (src, len(items), stored))
         except Exception as e:
             db.rollback()
+            _log("courses %s FAILED %r" % (src, e))
             report["sources"][src] = {"ok": False, "error": str(e)[:200]}
 
     report["finished_at"] = _now()
@@ -510,9 +546,11 @@ def is_stale(db):
     if row is None:
         return True
     # first run after the free/paid split: fetch the paid group once
-    if not db.execute("SELECT 1 FROM live_courses WHERE source = 'coursera' LIMIT 1").fetchone() \
-            and not db.execute("SELECT 1 FROM feed_runs WHERE report LIKE '%\"coursera\"%' LIMIT 1").fetchone():
-        return True
+    for src in ("coursera", "arabic"):
+        if not db.execute("SELECT 1 FROM live_courses WHERE source = ? LIMIT 1", (src,)).fetchone() \
+                and not db.execute("SELECT 1 FROM feed_runs WHERE report LIKE ? LIMIT 1",
+                                   ('%"' + src + '"%',)).fetchone():
+            return True
     try:
         t = datetime.strptime(row["finished_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     except Exception:
@@ -535,8 +573,17 @@ def refresh_in_background(app):
         global _running
         try:
             refresh(app.config["DATABASE"], run_id)
+            _log("refresh finished")
         except Exception:
-            pass
+            _log("refresh crashed: " + traceback.format_exc()[-600:])
+            try:
+                d = _connect(app.config["DATABASE"])
+                d.execute("UPDATE feed_runs SET finished_at=?, report=? WHERE id=?",
+                          (_now(), json.dumps({"error": "crashed"}), run_id))
+                d.commit()
+                d.close()
+            except Exception:
+                pass
         finally:
             with _lock:
                 _running = False
@@ -556,10 +603,77 @@ def is_running(db=None):
     return False
 
 
+_extras_lock = threading.Lock()
+_extras_running = False
+
+
+def _run_extra_source(db_path, src):
+    """Fetch and store one course source on its own connection, independent of the full refresh."""
+    db = _connect(db_path)
+    try:
+        try:
+            db.execute("SET lock_timeout = '20s'")
+            db.execute("SET statement_timeout = '90s'")
+            db.commit()
+        except Exception:
+            db.rollback()
+        started = _now()
+        items = COURSE_FETCHERS[src]()
+        n = _ingest_courses(db, src, items, nlp.build_alias_index(db), started)
+        _log("extra %s stored=%d" % (src, n))
+    except Exception as e:
+        _log("extra %s FAILED %r" % (src, e))
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def ensure_extras(app, db):
+    """Arabic list (tiny, static) is stored right away; the paid Coursera group runs in a
+    background thread. Both run on their own, so a slow full refresh never blocks them."""
+    global _extras_running
+    try:
+        have = {r["source"]: r["c"] for r in db.execute(
+            "SELECT source, COUNT(*) AS c FROM live_courses WHERE source IN ('arabic','coursera') GROUP BY source")}
+        from .arabic_courses import ARABIC_COURSES
+        need_ar = have.get("arabic", 0) != len(ARABIC_COURSES)
+        need_pa = not have.get("coursera")
+    except Exception:
+        return False
+    if not (need_ar or need_pa):
+        return False
+    with _extras_lock:
+        if _extras_running:
+            return False
+        _extras_running = True
+
+    def work():
+        global _extras_running
+        try:
+            if need_ar:
+                _run_extra_source(app.config["DATABASE"], "arabic")
+            if need_pa:
+                _run_extra_source(app.config["DATABASE"], "coursera")
+        finally:
+            with _extras_lock:
+                _extras_running = False
+
+    threading.Thread(target=work, daemon=True).start()
+    return True
+
+
 def maybe_refresh(app, db):
     """Called on feed requests and at start-up: refresh when the data is >24h old."""
-    if app.config.get("FEED_AUTO", True) and is_stale(db):
-        return refresh_in_background(app)
+    if app.config.get("FEED_AUTO", True):
+        ensure_extras(app, db)
+        if is_stale(db):
+            return refresh_in_background(app)
     return False
 
 

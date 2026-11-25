@@ -484,7 +484,7 @@ async function showProfile() {
 
 /* ---------- live feed (daily jobs + linked free courses) ---------- */
 
-const feedState = { tab: "jobs", country: "eg", field: "", offset: 0, fields: {}, st: null };
+const feedState = { tab: "jobs", country: "eg", lang: "", field: "", offset: 0, fields: {}, st: null };
 
 function minutesLabel(m) {
   if (!m) return "";
@@ -526,6 +526,7 @@ async function loadFeed(append, nav = navId) {
   if (feedState.field) params.set("field", feedState.field);
   if (isJobs && feedState.country) params.set("country", feedState.country);
   if (feedState.tab === "paid") params.set("pricing", "paid");
+  if (feedState.tab === "courses" && feedState.lang === "ar") params.set("source", "arabic");
   const data = await api((isJobs ? "/feed/jobs?" : "/feed/courses?") + params.toString());
   alive(nav);
   const items = isJobs ? data.jobs : data.courses;
@@ -544,9 +545,13 @@ async function loadFeed(append, nav = navId) {
 function drawFilters() {
   const st = feedState.st, isJobs = feedState.tab === "jobs";
   const c = document.getElementById("feedCountry");
-  c.classList.toggle("hidden", !isJobs);
-  c.innerHTML = [["eg", `🇪🇬 مصر (${st.egypt_jobs})`], ["world", `🌍 برّه مصر (${st.total_jobs - st.egypt_jobs})`], ["", "الكل"]]
-    .map(([v, l]) => `<button class="chipb${feedState.country === v ? " on" : ""}" data-c="${v}">${l}</button>`).join("");
+  const isFree = feedState.tab === "courses";
+  c.classList.toggle("hidden", !(isJobs || isFree));
+  const opts = isJobs
+    ? [["eg", `🇪🇬 مصر (${st.egypt_jobs})`], ["world", `🌍 برّه مصر (${st.total_jobs - st.egypt_jobs})`], ["", "الكل"]]
+    : [["ar", `🇪🇬 كورسات بالعربي (${st.arabic_courses || 0})`], ["", "كل اللغات"]];
+  const cur = isJobs ? feedState.country : feedState.lang;
+  c.innerHTML = opts.map(([v, l]) => `<button class="chipb${cur === v ? " on" : ""}" data-c="${v}">${l}</button>`).join("");
   const fields = isJobs ? st.job_fields : feedState.tab === "paid" ? st.paid_course_fields : st.course_fields;
   document.getElementById("paidNotice").classList.toggle("hidden", feedState.tab !== "paid");
   document.getElementById("freeNotice").classList.toggle("hidden", feedState.tab !== "courses");
@@ -569,7 +574,10 @@ async function showFeed() {
     : (st.refreshing ? "بنحمّل الوظائف... استنى دقيقة وحدّث الصفحة." : "جاري التحضير...");
   drawFilters();
   document.getElementById("feedCountry").onclick = (e) => {
-    if (e.target.dataset.c !== undefined) { feedState.country = e.target.dataset.c; drawFilters(); loadFeed(false); }
+    if (e.target.dataset.c !== undefined) {
+      if (feedState.tab === "courses") feedState.lang = e.target.dataset.c; else feedState.country = e.target.dataset.c;
+      drawFilters(); loadFeed(false);
+    }
   };
   document.getElementById("feedFields").onclick = (e) => {
     if (e.target.dataset.f !== undefined) { feedState.field = e.target.dataset.f; drawFilters(); loadFeed(false); }
