@@ -200,3 +200,68 @@ img, table { max-width: 100%; }
 .stage-title { margin: 18px 0 8px; color: #4f46e5; }
 a.btn { display: inline-block; text-decoration: none; margin-top: 8px; }
 #careerCats { margin: 8px 0 12px; }
+
+/* ================= v1.8 design refresh ================= */
+:root {
+  --primary: #4338ca;
+  --primary-dark: #3730a3;
+  --accent: #0d9488;
+  --bg: #f6f7fb;
+  --ink: #111827;
+  --line: #e6e8f2;
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(17,24,39,.04), 0 6px 18px rgba(67,56,202,.06);
+}
+body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.7; }
+h2 { font-size: 1.55rem; font-weight: 800; letter-spacing: -.2px; margin: 10px 0 4px; }
+h3 { font-size: 1.1rem; font-weight: 700; margin: 26px 0 8px; }
+.muted { color: #5b6477; line-height: 1.7; }
+
+#navbar .topbar { background: linear-gradient(135deg, #4338ca 0%, #0d9488 120%); box-shadow: 0 2px 14px rgba(67,56,202,.25); }
+.nav-brand { font-size: 1.2rem; font-weight: 800; }
+.card { border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+.jobc, .job-card { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.jobc:hover, .job-card:hover { transform: translateY(-2px); border-color: #c7c9f3; box-shadow: 0 10px 26px rgba(67,56,202,.12); }
+.jobc h3 { font-size: 1.05rem; font-weight: 700; }
+
+.btn { border-radius: 12px; font-weight: 700; font-family: inherit; transition: background .15s, transform .05s; }
+.btn:active { transform: scale(.98); }
+.btn.primary { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+input, textarea, select { border: 1.5px solid #d5d9ea; border-radius: 12px; font-family: inherit; background: #fff; }
+input:focus, textarea:focus, select:focus { outline: 3px solid rgba(79,70,229,.2); border-color: var(--primary); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid rgba(79,70,229,.45); outline-offset: 2px; }
+
+.seg { background: #e9ebf6; border-radius: 14px; padding: 4px; gap: 4px; }
+.seg button { font-weight: 700; font-size: .88rem; line-height: 1.3; }
+.seg button.on { color: var(--primary); }
+.chipb { border-color: var(--line); font-family: inherit; }
+.chipb.on { background: var(--primary); }
+
+.chip { background: #eef0fd; color: var(--primary-dark); font-weight: 600; }
+.chip.have { background: #dcfce7; color: #166534; }
+.chip.paid { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.badge { background: #eef0fd; color: var(--primary-dark); }
+
+.notice { border-radius: 14px; padding: 12px 14px; margin: 10px 0; font-size: .92rem; line-height: 1.7; }
+.notice.paid { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
+.notice.free { background: #ecfdf5; border: 1px solid #86efac; color: #14532d; }
+.paidnote { margin: 4px 0 0; color: #92400e; font-size: .82rem; font-weight: 600; }
+
+.addskill { border: 2px solid #c7c9f3; background: linear-gradient(180deg, #fff, #f6f6ff); }
+.addskill h3 { margin-top: 0; font-size: 1.2rem; }
+.chips.pick { gap: 8px; margin-top: 12px; }
+.pickb { border-color: #c7c9f3; font-weight: 600; }
+.pickb small { color: var(--muted); font-weight: 400; margin-inline-start: 4px; direction: ltr; display: inline-block; }
+.pickb.on { background: #dcfce7; border-color: #86efac; color: #166534; }
+.pickb.on small { color: #166534; }
+.chip .x { border: 0; background: rgba(0,0,0,.08); border-radius: 50%; width: 22px; height: 22px; line-height: 20px; padding: 0; margin-inline-start: 4px; cursor: pointer; color: inherit; font-size: 1rem; }
+.more-opt summary { cursor: pointer; font-weight: 700; color: var(--primary-dark); min-height: 40px; display: flex; align-items: center; }
+.more-opt[open] summary { margin-bottom: 8px; }
+
+.summary-card { border: 1px solid var(--line); border-radius: var(--radius); }
+.summary-card .num { color: var(--primary); font-weight: 800; }
+.empty-state { background: #fff; border: 1px dashed #cfd3ea; border-radius: var(--radius); }
+.auth-card h1 { font-weight: 800; }
+.tabbar a { font-weight: 600; }
+@media (min-width: 720px) { .seg button { font-size: .98rem; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

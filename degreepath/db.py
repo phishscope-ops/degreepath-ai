@@ -386,7 +386,8 @@ def init_db(app):
             db.executescript(SCHEMA)
         for table, col, ddl in (("live_jobs", "field", "TEXT DEFAULT 'other'"),
                                 ("live_jobs", "country", "TEXT DEFAULT ''"),
-                                ("live_courses", "field", "TEXT DEFAULT 'other'")):
+                                ("live_courses", "field", "TEXT DEFAULT 'other'"),
+                                ("live_courses", "pricing", "TEXT DEFAULT 'free'")):
             if col not in _table_columns(db, table):
                 db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         db.commit()

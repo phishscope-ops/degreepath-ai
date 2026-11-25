@@ -196,7 +196,7 @@ async function showDashboard() {
     )
     .join("");
   if (!skillsData.skills.length) {
-    summary.innerHTML += `<div class="card"><p class="muted">💡 لسه ما أضفتش مواد. روح لصفحة <a href="#/courses">موادي وكورساتي</a> وضيف موادك عشان النظام يستخرج مهاراتك ويطابقها بالوظائف.</p></div>`;
+    summary.innerHTML += `<div class="card"><p class="muted">💡 لسه ما أضفتش مواد. روح لصفحة <a href="#/courses">مهاراتي</a> وضيف مهاراتك (مش لازم مواد) عشان النظام ويطابقها بالوظائف.</p></div>`;
   }
 }
 
@@ -209,23 +209,28 @@ async function showCourses() {
   async function refresh() {
     const [coursesData, skillsData] = await Promise.all([api("/courses"), api("/skills")]);
     alive(nav);
+    const skillCourse = {};
+    coursesData.courses.filter((c) => c.kind === "skill").forEach((c) => c.skills.forEach((s) => (skillCourse[s.id] = c.id)));
     document.getElementById("allSkills").innerHTML =
-      skillsData.skills.map((s) => skillChip(s, "have")).join("") ||
-      `<span class="muted">لسه مفيش مهارات مستخرجة.</span>`;
+      skillsData.skills.map((s) => skillChip(s, "have") .replace("</span>", skillCourse[s.id] ? ` <button class="x" data-delskill="${skillCourse[s.id]}" aria-label="حذف المهارة">×</button></span>` : "</span>")).join("") ||
+      `<span class="muted">لسه ما أضفتش أي مهارة. ابحث فوق واضغط على المهارة.</span>`;
+    document.querySelectorAll("[data-delskill]").forEach((b) => {
+      b.onclick = async () => { await api("/courses/" + b.dataset.delskill, { method: "DELETE" }); refresh(); drawSkillResults(); };
+    });
     document.getElementById("courseList").innerHTML =
-      coursesData.courses
+      coursesData.courses.filter((c) => c.kind !== "skill")
         .map(
           (c) => `
       <div class="card course-item">
         <div>
-          <h4>${esc(c.title)} <span class="badge">${c.kind === "certification" ? "شهادة" : "مادة"}</span></h4>
+          <h4>${esc(c.title)} <span class="badge">${c.kind === "skill" ? "مهارة" : c.kind === "certification" ? "شهادة" : "مادة"}</span></h4>
           ${c.description ? `<p class="muted">${esc(c.description)}</p>` : ""}
           <div class="chips">${c.skills.map((s) => skillChip(s, "have")).join("") || '<span class="muted">لم تُستخرج مهارات</span>'}</div>
         </div>
         <button class="btn small danger" data-del="${c.id}">حذف</button>
       </div>`
         )
-        .join("") || `<div class="empty-state">لسه ما أضفتش مواد.</div>`;
+        .join("") || `<div class="empty-state">مفيش مواد مسجلة (ده اختياري). المهم تضيف مهاراتك من فوق.</div>`;
     document.querySelectorAll("[data-del]").forEach((btn) => {
       btn.onclick = async () => {
         await api("/courses/" + btn.dataset.del, { method: "DELETE" });
@@ -233,6 +238,32 @@ async function showCourses() {
       };
     });
   }
+
+  const skillQ = document.getElementById("skillQ");
+  const skillBox = document.getElementById("skillResults");
+  let skillTimer;
+  async function drawSkillResults() {
+    const r = await api("/skills/search?q=" + encodeURIComponent(skillQ.value.trim()));
+    alive(nav);
+    skillBox.innerHTML = r.skills.length
+      ? r.skills.map((s) => `<button class="chipb pickb${s.have ? " on" : ""}" data-sid="${s.id}" ${s.have ? "disabled" : ""}>${s.have ? "✓" : "+"} ${esc(s.name_ar || s.name)} <small>${esc(s.name)}</small></button>`).join("")
+      : `<span class="muted">مفيش مهارة بالاسم ده. جرّب كلمة تانية، أو أضف مادة من الأسفل.</span>`;
+  }
+  skillQ.oninput = () => { clearTimeout(skillTimer); skillTimer = setTimeout(drawSkillResults, 250); };
+  skillBox.onclick = async (e) => {
+    const b = e.target.closest("[data-sid]");
+    if (!b || b.disabled) return;
+    document.getElementById("skillErr").textContent = "";
+    try {
+      const r = await api("/skills/add", { method: "POST", body: JSON.stringify({ skill_id: Number(b.dataset.sid) }) });
+      document.getElementById("skillMsg").textContent = "اتضافت المهارة: " + (r.skill.name_ar || r.skill.name);
+      await refresh();
+      await drawSkillResults();
+    } catch (err) {
+      document.getElementById("skillErr").textContent = err.message;
+    }
+  };
+  drawSkillResults().catch((e) => { if (!(e instanceof Stale)) document.getElementById("skillErr").textContent = e.message; });
 
   const catalogSelect = document.getElementById("catalogSelect");
   const catalogError = document.getElementById("catalogError");
@@ -461,9 +492,10 @@ function minutesLabel(m) {
 }
 
 function freeBadge(f) {
+  if (f === "paid") return '<span class="chip paid" title="تجربة مجانية 7 أيام ثم اشتراك">💳 مدفوع بعد تجربة 7 أيام</span>';
   return f === "audit"
     ? '<span class="chip" title="مجاني للمشاهدة، الشهادة مدفوعة">مجاني (Audit)</span>'
-    : '<span class="chip have">مجاني</span>';
+    : '<span class="chip have">🆓 مجاني 100%</span>';
 }
 
 function feedCard(j) {
@@ -481,7 +513,7 @@ function courseCard(c) {
   return `<a class="card jobc" href="${esc(c.url)}" target="_blank" rel="noopener">
     <div class="jobc-top"><h3>${esc(c.title)}</h3></div>
     <p class="muted">${esc(c.summary).slice(0, 110)}${c.summary.length > 110 ? "…" : ""}</p>
-    <div class="chips"><span class="chip">${esc(c.provider)}</span>${freeBadge(c.free)}<span class="chip">${esc(c.field_label)}</span>${c.duration_min ? `<span class="chip">${minutesLabel(c.duration_min)}</span>` : ""}</div>
+    ${c.free === "paid" ? `<p class="paidnote">${esc(c.pricing_note)}</p>` : ""}<div class="chips"><span class="chip">${esc(c.provider)}</span>${freeBadge(c.free)}<span class="chip">${esc(c.field_label)}</span>${c.duration_min ? `<span class="chip">${minutesLabel(c.duration_min)}</span>` : ""}</div>
   </a>`;
 }
 
@@ -493,6 +525,7 @@ async function loadFeed(append, nav = navId) {
   const params = new URLSearchParams({ q, sort, limit: 20, offset: feedState.offset });
   if (feedState.field) params.set("field", feedState.field);
   if (isJobs && feedState.country) params.set("country", feedState.country);
+  if (feedState.tab === "paid") params.set("pricing", "paid");
   const data = await api((isJobs ? "/feed/jobs?" : "/feed/courses?") + params.toString());
   alive(nav);
   const items = isJobs ? data.jobs : data.courses;
@@ -514,7 +547,9 @@ function drawFilters() {
   c.classList.toggle("hidden", !isJobs);
   c.innerHTML = [["eg", `🇪🇬 مصر (${st.egypt_jobs})`], ["world", `🌍 برّه مصر (${st.total_jobs - st.egypt_jobs})`], ["", "الكل"]]
     .map(([v, l]) => `<button class="chipb${feedState.country === v ? " on" : ""}" data-c="${v}">${l}</button>`).join("");
-  const fields = isJobs ? st.job_fields : st.course_fields;
+  const fields = isJobs ? st.job_fields : feedState.tab === "paid" ? st.paid_course_fields : st.course_fields;
+  document.getElementById("paidNotice").classList.toggle("hidden", feedState.tab !== "paid");
+  document.getElementById("freeNotice").classList.toggle("hidden", feedState.tab !== "courses");
   document.getElementById("feedFields").innerHTML =
     `<button class="chipb${feedState.field === "" ? " on" : ""}" data-f="">كل المجالات</button>` +
     fields.map((f) => `<button class="chipb${feedState.field === f.field ? " on" : ""}" data-f="${esc(f.field)}">${esc(f.label)} (${f.count})</button>`).join("");
@@ -530,7 +565,7 @@ async function showFeed() {
   feedState.st = st;
   const when = st.last_refresh_utc ? st.last_refresh_utc.slice(0, 16) + " UTC" : "لسه";
   document.getElementById("feedStatus").textContent = st.total_jobs
-    ? `${st.total_jobs} وظيفة (${st.egypt_jobs} في مصر) و${st.total_courses} كورس مجاني. آخر تحديث: ${when}`
+    ? `${st.total_jobs} وظيفة (${st.egypt_jobs} في مصر) و${st.total_courses} كورس مجاني 100%${st.paid_courses ? " (و" + st.paid_courses + " كورس مدفوع في تبويب منفصل)" : ""}. آخر تحديث: ${when}`
     : (st.refreshing ? "بنحمّل الوظائف... استنى دقيقة وحدّث الصفحة." : "جاري التحضير...");
   drawFilters();
   document.getElementById("feedCountry").onclick = (e) => {

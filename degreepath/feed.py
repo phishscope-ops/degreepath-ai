@@ -50,7 +50,13 @@ SOURCE_INFO = {
     "himalayas": {"name": "Himalayas", "kind": "job", "site": "https://himalayas.app",
                   "note": "رابط التقديم يفتح Himalayas"},
     "mslearn": {"name": "Microsoft Learn", "kind": "course", "site": "https://learn.microsoft.com/training/",
-                "note": "مجاني بالكامل"},
+                "note": "مجاني بالكامل", "pricing": "free"},
+    "curated": {"name": "مصادر مجانية مختارة", "kind": "course", "site": "https://www.freecodecamp.org/",
+                "note": "مصادر مجانية من الأول للآخر (freeCodeCamp, Kaggle, Khan Academy, Google وغيرها)",
+                "pricing": "free"},
+    "coursera": {"name": "Coursera", "kind": "course", "site": "https://www.coursera.org/",
+                 "note": "تجربة مجانية 7 أيام ثم اشتراك مدفوع (بعض الكورسات ليها خيار مراجعة مجاني، اتأكد في صفحة الكورس)",
+                 "pricing": "paid"},
 }
 
 
@@ -240,7 +246,42 @@ def fetch_mslearn():
     return out
 
 
-COURSE_FETCHERS = {"mslearn": fetch_mslearn}
+def fetch_curated():
+    """The hand-picked resources (free end to end) as feed items, so they show in the free group."""
+    import hashlib
+    from . import seed
+    out = []
+    for skill, title, url, kind in seed.RESOURCES:
+        if "coursera.org" in url or url in getattr(seed, "PAID_URLS", ()):
+            continue
+        out.append(dict(ext_id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
+                        summary=f"{skill} ({kind})", url=url, level="", duration_min=0))
+    return out
+
+
+COURSERA_PAGES = 12          # 12 x 100 courses scanned from the public catalog
+COURSERA_KEEP = 300
+
+
+def fetch_coursera():
+    """Public Coursera catalog (no key). Marked paid: 7-day trial, then subscription."""
+    out = []
+    for page in range(COURSERA_PAGES):
+        d = _get("https://api.coursera.org/api/courses.v1?start=%d&limit=100"
+                 "&fields=name,slug,description,primaryLanguages,workload" % (page * 100))
+        for c in d.get("elements", []):
+            langs = c.get("primaryLanguages") or []
+            if langs and "en" not in langs and "ar" not in langs:
+                continue
+            out.append(dict(ext_id=c["id"], title=c["name"], summary=clean(c.get("description"), 400),
+                            url="https://www.coursera.org/learn/" + c["slug"], level="",
+                            duration_min=0))
+        if not d.get("paging", {}).get("next"):
+            break
+    return out
+
+
+COURSE_FETCHERS = {"mslearn": fetch_mslearn, "curated": fetch_curated, "coursera": fetch_coursera}
 
 
 # ------------------------------------------------------------------ refresh
@@ -400,10 +441,6 @@ def refresh(db_path, run_id=None):
             db.rollback()
             report["sources"][src] = {"ok": False, "error": str(e)[:200]}
 
-    # Coursera is only free for a trial period; keep it out of the app entirely.
-    db.execute("DELETE FROM live_courses WHERE source = 'coursera'")
-    db.commit()
-
     for src, fn in COURSE_FETCHERS.items():
         try:
             items = fn()
@@ -412,7 +449,7 @@ def refresh(db_path, run_id=None):
             stored, extra, listed = 0, 0, set()
             for it in items:
                 ids = nlp.extract_skills(f"{it['title']} {it['summary']}", alias_index)
-                if not ids:
+                if not ids and src != "curated":
                     if extra >= EXTRA_COURSES or src != "coursera":
                         continue
                     extra += 1
@@ -420,13 +457,14 @@ def refresh(db_path, run_id=None):
                 listed.add(it["ext_id"])
                 db.execute(
                     """INSERT INTO live_courses (source, ext_id, title, summary, url, level,
-                       duration_min, fetched_at, field) VALUES (?,?,?,?,?,?,?,?,?)
+                       duration_min, fetched_at, field, pricing) VALUES (?,?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(source, ext_id) DO UPDATE SET title=excluded.title,
                        summary=excluded.summary, url=excluded.url, level=excluded.level,
                        duration_min=excluded.duration_min, fetched_at=excluded.fetched_at,
-                       field=excluded.field""",
+                       field=excluded.field, pricing=excluded.pricing""",
                     (src, it["ext_id"], it["title"][:200], it["summary"], it["url"],
-                     it["level"], it["duration_min"], _now(), fld),
+                     it["level"], it["duration_min"], _now(), fld,
+                     SOURCE_INFO.get(src, {}).get("pricing", "free")),
                 )
                 cid = db.execute("SELECT id FROM live_courses WHERE source=? AND ext_id=?",
                                  (src, it["ext_id"])).fetchone()["id"]
@@ -470,6 +508,10 @@ def is_stale(db):
            AND report LIKE '%"ok": true%' ORDER BY id DESC LIMIT 1"""
     ).fetchone()
     if row is None:
+        return True
+    # first run after the free/paid split: fetch the paid group once
+    if not db.execute("SELECT 1 FROM live_courses WHERE source = 'coursera' LIMIT 1").fetchone() \
+            and not db.execute("SELECT 1 FROM feed_runs WHERE report LIKE '%\"coursera\"%' LIMIT 1").fetchone():
         return True
     try:
         t = datetime.strptime(row["finished_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
@@ -528,7 +570,7 @@ def courses_for_skill(db, skill_id, limit=3):
     rows = db.execute(
         """SELECT c.title, c.url, c.source, c.level, c.duration_min FROM live_courses c
            JOIN live_course_skills cs ON cs.course_id = c.id
-           WHERE cs.skill_id = ? ORDER BY c.source,
+           WHERE cs.skill_id = ? AND COALESCE(c.pricing, 'free') = 'free' ORDER BY c.source,
              (SELECT COUNT(*) FROM live_course_skills x WHERE x.course_id = c.id), c.title""",
         (skill_id,),
     ).fetchall()

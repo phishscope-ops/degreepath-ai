@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
 <title>مسارك - طريقك من الدراسة للوظيفة</title>
-<link rel="stylesheet" href="/style.css?v=1.7.0">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=1.8.0">
 </head>
 <body>
 <nav id="navbar" class="hidden">
@@ -18,7 +19,7 @@
     <a href="#/dashboard" data-route="dashboard"><i>🏠</i><span>الرئيسية</span></a>
     <a href="#/feed" data-route="feed"><i>🔥</i><span>وظائف اليوم</span></a>
     <a href="#/jobs" data-route="jobs"><i>💼</i><span>الوظائف</span></a>
-    <a href="#/courses" data-route="courses"><i>📚</i><span>موادي</span></a>
+    <a href="#/courses" data-route="courses"><i>✨</i><span>مهاراتي</span></a>
     <a href="#/profile" data-route="profile"><i>👤</i><span>ملفي</span></a>
   </div>
 </nav>
@@ -61,32 +62,35 @@
 
 <template id="tpl-courses">
   <div class="page">
-    <h2>موادي وكورساتي</h2>
-    <div class="card">
-      <h3>إضافة من قائمة مقررات القسم</h3>
-      <p class="muted">قائمة مقررات قسم إدارة نظم المعلومات وتكنولوجياها (لائحة 2023/2024). اختر المادة وهتتضاف بمهاراتها على طول.</p>
+    <h2>مهاراتي</h2>
+    <p class="muted">هنا بتضيف <b>المهارات</b> اللي بتعرفها (زي Python أو إكسل أو التصميم). المواقع بتقارن مهاراتك بالوظائف وتقولك الناقص.</p>
+    <div class="card addskill">
+      <h3>➕ أضف مهارة</h3>
+      <p class="muted">ابحث باسم المهارة بالعربي أو الإنجليزي، واضغط عليها عشان تتضاف. <b>مش لازم تكتب اسم مادة أو كورس.</b></p>
+      <input type="search" id="skillQ" placeholder="مثال: بايثون، إكسل، تصميم، SQL" enterkeyhint="search" autocomplete="off">
+      <div id="skillResults" class="chips pick"></div>
+      <p class="success" id="skillMsg"></p>
+      <p class="error" id="skillErr"></p>
+    </div>
+    <h3>✅ مهاراتك الحالية</h3>
+    <div id="allSkills" class="chips"></div>
+    <details class="card more-opt">
+      <summary>مش لاقي المهارة؟ أضف مادة من الجامعة أو كورس خلصته</summary>
+      <p class="muted">النظام بيستخرج المهارات من اسم المادة ووصفها. ده اختياري.</p>
       <div style="display:flex;gap:8px;align-items:center">
         <select id="catalogSelect" style="flex:1"></select>
         <button class="btn primary" id="catalogAddBtn">إضافة</button>
       </div>
       <p class="error" id="catalogError"></p>
-    </div>
-    <div class="card">
-      <h3>إضافة مادة أو كورس يدويًا</h3>
-      <p class="muted">اكتب اسم المادة ووصفها، والنظام هيستخرج المهارات تلقائيًا من الوصف.</p>
       <form id="courseForm">
-        <label>اسم المادة / الكورس<input type="text" name="title" required placeholder="مثال: Python Programming and Statistical Analysis"></label>
-        <label>الوصف<textarea name="description" rows="3" placeholder="مثال: This course covers Python programming, statistics, data cleaning and data visualization with pandas."></textarea></label>
-        <label>النوع
-          <select name="kind"><option value="course">مادة دراسية</option><option value="certification">كورس / شهادة</option></select>
-        </label>
+        <label>اسم المادة أو الكورس<input type="text" name="title" required placeholder="مثال: Python Programming and Statistical Analysis"></label>
+        <label>الوصف (اختياري)<textarea name="description" rows="3" placeholder="اكتب اللي اتعلمته في جملتين"></textarea></label>
+        <input type="hidden" name="kind" value="course">
         <button class="btn primary" type="submit">إضافة وتحليل</button>
       </form>
       <div id="courseResult"></div>
-    </div>
-    <h3>المهارات المستخرجة من كل موادك</h3>
-    <div id="allSkills" class="chips"></div>
-    <h3>المواد المسجلة</h3>
+    </details>
+    <h3>المواد والكورسات المسجلة</h3>
     <div id="courseList"></div>
   </div>
 </template>
@@ -122,10 +126,13 @@
     <p class="muted" id="feedStatus">...</p>
     <div class="seg" id="feedTabs">
       <button data-t="jobs" class="on">وظائف</button>
-      <button data-t="courses">كورسات مجانية</button>
+      <button data-t="courses">🆓 كورسات مجانية 100%</button>
+      <button data-t="paid">💳 كورسات مدفوعة</button>
     </div>
+    <div class="notice paid hidden" id="paidNotice"><b>كورسات مدفوعة (Coursera).</b> بتبدأ بتجربة مجانية 7 أيام وبعدها اشتراك مدفوع. موقع مسارك نفسه مجاني، والكورسات دي مفصولة عشان تعرف الفرق. الأفضل تبدأ بالمجانية.</div>
+    <div class="notice free hidden" id="freeNotice"><b>كل الكورسات هنا مجانية 100%</b> من البداية للآخر، من مصادر زي Microsoft Learn وfreeCodeCamp وKaggle.</div>
     <div class="filters">
-      <input type="search" id="feedQ" placeholder="ابحث باسم الوظيفة أو الشركة" enterkeyhint="search">
+      <input type="search" id="feedQ" placeholder="ابحث بالعربي أو الإنجليزي: بايثون، محاسب، تسويق..." enterkeyhint="search">
       <div class="chiprow" id="feedCountry"></div>
       <div class="chiprow" id="feedFields"></div>
       <select id="feedSort"><option value="new">الأحدث</option><option value="match">الأنسب لمهاراتك</option></select>
@@ -165,6 +172,6 @@
   </div>
 </template>
 
-<script src="/app.js?v=1.7.0"></script>
+<script src="/app.js?v=1.8.0"></script>
 </body>
 </html>

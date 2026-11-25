@@ -4,7 +4,7 @@ import json
 from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import feed, matching, nlp, security
+from . import arsearch, feed, matching, nlp, security
 from .auth import (
     create_session,
     current_user,
@@ -151,7 +151,7 @@ def add_course():
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     description = (data.get("description") or "").strip()
-    kind = data.get("kind") if data.get("kind") in ("course", "certification") else "course"
+    kind = data.get("kind") if data.get("kind") in ("course", "certification", "skill") else "course"
     if not title:
         return jsonify({"error": "اسم المادة مطلوب"}), 400
     db = get_db()
@@ -234,6 +234,52 @@ def my_skills():
         (g.user["id"],),
     ).fetchall()
     return jsonify({"skills": [dict(r) for r in rows]})
+
+
+@bp.get("/skills/search")
+@login_required
+def skills_search():
+    """Find skills to add by name, in Arabic or English (empty query = the most wanted skills)."""
+    db = get_db()
+    q = (request.args.get("q") or "").strip()
+    cat = matching.catalog(db)
+    mine = matching.student_skill_ids(db, g.user["id"])
+    aliases = {}
+    for r in _cached_rows(db, "SELECT skill_id, alias FROM skill_aliases"):
+        aliases.setdefault(r["skill_id"], []).append(r["alias"])
+    groups = arsearch.parse(q)
+    out = []
+    for sid, sk in cat["smap"].items():
+        if groups:
+            hay = [sk["name"], sk["name_ar"] or ""] + aliases.get(sid, [])
+            if not arsearch.matches(groups, " ".join(hay)):
+                continue
+        out.append({"id": sid, "name": sk["name"], "name_ar": sk["name_ar"], "category": sk["category"],
+                    "have": sid in mine, "demand": cat["demand"].get(sid, 0)})
+    out.sort(key=lambda x: (-x["demand"], x["name"]))
+    return jsonify({"skills": out[:24]})
+
+
+@bp.post("/skills/add")
+@login_required
+def skills_add():
+    """Add one skill (not a subject or course) to the student's profile."""
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        sid = int(data.get("skill_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "اختار مهارة من القائمة"}), 400
+    sk = db.execute("SELECT id, name, name_ar, category FROM skills WHERE id = ?", (sid,)).fetchone()
+    if sk is None:
+        return jsonify({"error": "المهارة دي مش موجودة"}), 404
+    if sid in matching.student_skill_ids(db, g.user["id"]):
+        return jsonify({"skill": dict(sk), "already": True}), 200
+    cur = db.execute("INSERT INTO courses (user_id, title, description, kind) VALUES (?, ?, ?, 'skill')",
+                     (g.user["id"], sk["name"], sk["name"]))
+    db.execute("INSERT OR IGNORE INTO course_skills (course_id, skill_id) VALUES (?, ?)", (cur.lastrowid, sid))
+    db.commit()
+    return jsonify({"skill": dict(sk), "already": False}), 201
 
 
 @bp.post("/extract")
@@ -467,9 +513,19 @@ def _feed_status():
         "course_fields": [
             {"field": r["f"], "label": feed.FIELD_LABELS.get(r["f"], r["f"]), "count": r["c"]}
             for r in db.execute(
-                "SELECT COALESCE(field,'other') AS f, COUNT(*) AS c FROM live_courses GROUP BY f ORDER BY c DESC")
+                "SELECT COALESCE(field,'other') AS f, COUNT(*) AS c FROM live_courses "
+                "WHERE COALESCE(pricing,'free')='free' GROUP BY f ORDER BY c DESC")
         ],
-        "total_courses": sum(r["c"] for r in courses),
+        "paid_course_fields": [
+            {"field": r["f"], "label": feed.FIELD_LABELS.get(r["f"], r["f"]), "count": r["c"]}
+            for r in db.execute(
+                "SELECT COALESCE(field,'other') AS f, COUNT(*) AS c FROM live_courses "
+                "WHERE pricing='paid' GROUP BY f ORDER BY c DESC")
+        ],
+        "total_courses": db.execute(
+            "SELECT COUNT(*) AS n FROM live_courses WHERE COALESCE(pricing,'free')='free'").fetchone()["n"],
+        "paid_courses": db.execute(
+            "SELECT COUNT(*) AS n FROM live_courses WHERE pricing='paid'").fetchone()["n"],
         "last_report": last,
     })
 
@@ -493,9 +549,6 @@ def feed_jobs():
     if source:
         where.append("source = ?")
         args.append(source)
-    if q:
-        where.append("(lower(title) LIKE ? OR lower(company) LIKE ?)")
-        args += [f"%{q}%", f"%{q}%"]
     field = request.args.get("field") or ""
     if field:
         where.append("field = ?")
@@ -509,6 +562,9 @@ def feed_jobs():
         sql += " WHERE " + " AND ".join(where)
     reqs_map = _feed_reqs_map(db)
     rows = [_feed_job_row(db, j, user_skills, reqs_map) for j in _cached_rows(db, sql, args)]
+    groups = arsearch.parse(q)
+    if groups:
+        rows = [r for r in rows if arsearch.matches(groups, r["title"], r["company"], r["field_label"], r["location"])]
     if sort == "new":
         rows.sort(key=lambda r: r["posted_at"] or "", reverse=True)
     else:
@@ -537,41 +593,47 @@ def _interleave(rows):
 @bp.get("/feed/courses")
 @login_required
 def feed_courses():
+    """Courses in two separate groups: pricing=free (100% free, default) or pricing=paid
+    (Coursera: free trial then subscription). The two are never mixed in one list."""
     db = get_db()
-    q = (request.args.get("q") or "").strip().lower()
+    q = (request.args.get("q") or "").strip()
     field = request.args.get("field") or ""
     source = request.args.get("source") or ""
+    pricing = "paid" if request.args.get("pricing") == "paid" else "free"
     try:
         limit = max(1, min(int(request.args.get("limit", 30)), 100))
         offset = max(0, int(request.args.get("offset", 0)))
     except ValueError:
         limit, offset = 30, 0
-    where, args = [], []
-    if q:
-        where.append("(lower(title) LIKE ? OR lower(summary) LIKE ?)")
-        args += [f"%{q}%", f"%{q}%"]
+    where = ["COALESCE(pricing,'free') = ?" if pricing == "free" else "pricing = 'paid'"]
+    args = ["free"] if pricing == "free" else []
     if field:
         where.append("field = ?")
         args.append(field)
     if source:
         where.append("source = ?")
         args.append(source)
-    w = (" WHERE " + " AND ".join(where)) if where else ""
-    total = _cached_rows(db, "SELECT COUNT(*) AS n FROM live_courses" + w, args)[0]["n"]
     rows = _cached_rows(db,
-        "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses" + w
-        + " ORDER BY id LIMIT ? OFFSET ?", args + [limit, offset])
+        "SELECT id, source, title, summary, url, level, duration_min, field FROM live_courses WHERE "
+        + " AND ".join(where) + " ORDER BY id", args)
+    groups = arsearch.parse(q)
+    if groups:
+        rows = [r for r in rows if arsearch.matches(groups, r["title"], r["summary"])]
+        # best matches first: a hit in the title beats a hit in the summary only
+        rows.sort(key=lambda r: not arsearch.matches(groups, r["title"]))
+    total = len(rows)
     out = []
-    for r in rows:
+    for r in rows[offset: offset + limit]:
         info = feed.SOURCE_INFO.get(r["source"], {})
         out.append({
-            "id": r["id"], "title": r["title"], "summary": r["summary"], "url": r["url"],
+            "id": r["id"], "title": r["title"], "summary": r["summary"] or "", "url": r["url"],
             "level": r["level"], "duration_min": r["duration_min"],
             "provider": info.get("name", r["source"]),
-            "free": "free",
+            "free": "free" if pricing == "free" else "paid",
+            "pricing_note": "" if pricing == "free" else "تجربة مجانية 7 أيام ثم اشتراك مدفوع",
             "field_label": feed.FIELD_LABELS.get(r["field"] or "other", ""),
         })
-    return jsonify({"total": total, "courses": out})
+    return jsonify({"total": total, "pricing": pricing, "courses": out})
 
 
 @bp.get("/feed/jobs/<int:job_id>")
