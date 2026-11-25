@@ -643,7 +643,10 @@ def ensure_extras(app, db):
             "SELECT source, COUNT(*) AS c FROM live_courses WHERE source IN ('arabic','coursera') GROUP BY source")}
         from .arabic_courses import ARABIC_COURSES
         need_ar = have.get("arabic", 0) != len(ARABIC_COURSES)
-        need_pa = not have.get("coursera")
+        # rows stored by older versions carry pricing=free: flip them to paid right away
+        db.execute("UPDATE live_courses SET pricing='paid' WHERE source='coursera' AND COALESCE(pricing,'free')!='paid'")
+        db.commit()
+        need_pa = db.execute("SELECT COUNT(*) AS n FROM live_courses WHERE source='coursera' AND pricing='paid'").fetchone()["n"] == 0
     except Exception:
         return False
     if not (need_ar or need_pa):
