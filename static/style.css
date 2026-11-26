@@ -265,3 +265,28 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .tabbar a { font-weight: 600; }
 @media (min-width: 720px) { .seg button { font-size: .98rem; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* v1.10 UI polish (CSS only) */
+body { background: radial-gradient(1200px 500px at 85% -10%, #e6e8ff 0%, transparent 60%), radial-gradient(900px 400px at 0% 0%, #d9f5f0 0%, transparent 55%), var(--bg); background-attachment: fixed; }
+.page h2 { font-weight: 800; font-size: 1.55rem; letter-spacing: -.2px; position: relative; padding-inline-start: 14px; }
+.page h2::before { content: ""; position: absolute; inset-inline-start: 0; top: 18%; bottom: 18%; width: 5px; border-radius: 4px; background: linear-gradient(180deg, #4f46e5, #0d9488); }
+.card, .summary-card, .job-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.card:hover, .job-card:hover { box-shadow: 0 10px 28px rgba(67,56,202,.12); border-color: #c7c9f3; }
+.job-card:hover { transform: translateY(-3px); }
+.summary-card { background: linear-gradient(180deg, #fff, #f7f8ff); box-shadow: 0 4px 14px rgba(67,56,202,.07); }
+.summary-card .num { background: linear-gradient(135deg, #4f46e5, #0d9488); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.btn.primary { background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 4px 12px rgba(79,70,229,.28); }
+.btn.primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.98); }
+.seg { box-shadow: inset 0 1px 3px rgba(0,0,0,.06); }
+.seg button.on { box-shadow: 0 3px 10px rgba(67,56,202,.18); font-weight: 800; }
+.chip { border: 1px solid rgba(79,70,229,.12); }
+.match-bar { height: 8px; }
+.match-bar > div { background-image: linear-gradient(90deg, #4f46e5, #0d9488); transition: width .6s ease; }
+:focus-visible { outline: 3px solid rgba(79,70,229,.45); outline-offset: 2px; border-radius: 10px; }
+@keyframes mrk-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.page > *, #feedList > *, .grid > * { animation: mrk-in .35s ease both; }
+.tabbar { box-shadow: 0 -4px 18px rgba(31,41,55,.08); backdrop-filter: blur(8px); }
+.tabbar a.on, .tabbar a.active { color: var(--primary-dark); }
+@media (max-width: 520px) { .page h2 { font-size: 1.35rem; } .card { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .page > *, #feedList > *, .grid > * { animation: none !important; } }
