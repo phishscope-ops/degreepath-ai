@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#4f46e5">
 <title>مسارك - طريقك من الدراسة للوظيفة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=1.10.0">
+<link rel="stylesheet" href="/style.css?v=1.11.0">
 </head>
 <body>
 <nav id="navbar" class="hidden">
@@ -55,6 +55,7 @@
   <div class="page">
     <h2>لوحة التحكم</h2>
     <div id="dashSummary"></div>
+    <div id="dashRoadmap"></div>
     <h3>الوظائف المقترحة ليك</h3>
     <div id="dashMatches" class="grid"></div>
   </div>
@@ -64,6 +65,15 @@
   <div class="page">
     <h2>مهاراتي</h2>
     <p class="muted">هنا بتضيف <b>المهارات</b> اللي بتعرفها (زي Python أو إكسل أو التصميم). المواقع بتقارن مهاراتك بالوظائف وتقولك الناقص.</p>
+    <div class="card facpick">
+      <h3>🎓 مواد كليتي</h3>
+      <p class="muted">اختار القسم والسنة، علّم على المواد اللي دخلتها أو بتدرسها، والنظام يطلعلك مهاراتك والوظيفة المناسبة والمهارات الناقصة.</p>
+      <select id="facDept"></select>
+      <div id="facYears" class="chips pick"></div>
+      <div id="facList"></div>
+      <div class="facbar"><button class="btn" id="facAll" type="button">تحديد الكل</button> <button class="btn primary" id="facAdd" type="button">إضافة المحدد</button> <span class="success" id="facMsg"></span></div>
+      <p class="error" id="facErr"></p>
+    </div>
     <div class="card addskill">
       <h3>➕ أضف مهارة</h3>
       <p class="muted">ابحث باسم المهارة بالعربي أو الإنجليزي، واضغط عليها عشان تتضاف. <b>مش لازم تكتب اسم مادة أو كورس.</b></p>
@@ -157,11 +167,14 @@
       <form id="profileForm">
         <label>الجامعة<input type="text" name="university"></label>
         <label>الكلية / التخصص<input type="text" name="major"></label>
+        <label>القسم (كلية نظم المعلومات والإدارة)
+          <select name="department"><option value="">اختر...</option><option value="ims">إدارة نظم المعلومات</option><option value="bis">نظم معلومات الأعمال</option><option value="bmt">تكنولوجيا الإدارة والأعمال</option><option value="act">تكنولوجيا المحاسبة</option></select>
+        </label>
         <label>السنة الدراسية
           <select name="study_year">
             <option value="">اختر...</option>
             <option>الأولى</option><option>الثانية</option>
-            <option>الثالثة</option><option>الرابعة</option><option>خريج</option>
+            <option>الثالثة</option><option>الرابعة</option><option>الخامسة</option><option>خريج</option>
           </select>
         </label>
         <label>الوظيفة المستهدفة<select name="target_job_id" id="targetJobSelect"><option value="">اختر وظيفة...</option></select></label>
@@ -172,6 +185,6 @@
   </div>
 </template>
 
-<script src="/app.js?v=1.10.0"></script>
+<script src="/app.js?v=1.11.0"></script>
 </body>
 </html>

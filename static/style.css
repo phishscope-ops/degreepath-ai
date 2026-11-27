@@ -290,3 +290,16 @@ body { background: radial-gradient(1200px 500px at 85% -10%, #e6e8ff 0%, transpa
 .tabbar a.on, .tabbar a.active { color: var(--primary-dark); }
 @media (max-width: 520px) { .page h2 { font-size: 1.35rem; } .card { padding: 16px; } }
 @media (prefers-reduced-motion: reduce) { .page > *, #feedList > *, .grid > * { animation: none !important; } }
+
+/* v1.11 */
+.facpick select, #dashTrack { width: 100%; margin: 6px 0; }
+.facrow { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid #eef2f7; cursor: pointer; }
+.facrow input { width: auto; margin: 0; }
+.facbar { position: sticky; bottom: 0; background: #fff; padding: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stage-title { margin: 18px 0 8px; padding: 6px 12px; border-radius: 10px; background: linear-gradient(90deg,#eef2ff,#f8fafc); border-right: 4px solid var(--primary); }
+.roadmap-step { transition: box-shadow .15s, transform .15s; }
+.roadmap-step:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
+.roadmap-step.done { background: #f0fdf4; border-color: #bbf7d0; }
+.chip { border-radius: 999px; padding: 5px 12px; }
+.sources { margin-top: 16px; background: #f8fafc; }
+.sources a { color: var(--primary); word-break: break-all; }

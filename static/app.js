@@ -177,6 +177,26 @@ async function showDashboard() {
       <div class="summary-card"><div class="num">${esc(profileData.profile.target_job_title_ar || "-")}</div><div class="lbl">هدفك</div></div>
     </div>`;
 
+  const rm = document.getElementById("dashRoadmap");
+  const tid = profileData.profile.target_job_id;
+  try {
+    const jobs = (await api("/careers")).careers;
+    alive(nav);
+    const opts = '<option value="">اختر مسار...</option>' + jobs.map((c) => `<option value="${c.id}"${c.id == tid ? " selected" : ""}>${esc(c.title_ar || c.title)}</option>`).join("");
+    rm.innerHTML = `<div class="card"><h3>🎯 مسارك والخطة</h3><p class="muted">اختار المسار وهتشوف الخطة كاملة (مهارات + كورسات مجانية) حتى من غير ما تضيف مهارات.</p><select id="dashTrack">${opts}</select><div id="dashTrackBody"></div></div>`;
+    const body = document.getElementById("dashTrackBody");
+    const sel = document.getElementById("dashTrack");
+    async function draw(id) {
+      if (!id) { body.innerHTML = ""; return; }
+      body.innerHTML = '<p class="muted">جاري التحميل...</p>';
+      const r = await api("/careers/" + id);
+      alive(nav);
+      body.innerHTML = `<p><a href="#/careers/${id}">صفحة المسار كاملة</a></p>` + roadmapHTML(r) + sourcesHTML(r);
+    }
+    sel.onchange = () => draw(sel.value).catch((e) => { if (!(e instanceof Stale)) body.innerHTML = `<p class="error">${esc(e.message)}</p>`; });
+    if (tid) await draw(String(tid));
+  } catch (e) { if (e instanceof Stale) return; }
+
   const wrap = document.getElementById("dashMatches");
   if (!matchesData.matches.length) {
     wrap.innerHTML = `<div class="empty-state">لسه مفيش وظائف في النظام.</div>`;
@@ -264,6 +284,42 @@ async function showCourses() {
     }
   };
   drawSkillResults().catch((e) => { if (!(e instanceof Stale)) document.getElementById("skillErr").textContent = e.message; });
+
+  /* faculty picker */
+  const facDept = document.getElementById("facDept");
+  const facList = document.getElementById("facList");
+  const facYears = document.getElementById("facYears");
+  const fac = { all: [], depts: [], year: 1 };
+  function facDraw() {
+    facYears.innerHTML = [1, 2, 3, 4, 5].map((y) => `<button type="button" class="chipb pickb${fac.year === y ? " on" : ""}" data-y="${y}">${y === 5 ? "الخامسة / خريج (الكل)" : "السنة " + y}</button>`).join("");
+    const rows = fac.all.filter((c) => c.department === facDept.value && (fac.year === 5 || c.level === fac.year));
+    const groups = {};
+    rows.forEach((c) => { const k = fac.year === 5 ? `السنة ${c.level} - ترم ${c.semester}` : `ترم ${c.semester}`; (groups[k] = groups[k] || []).push(c); });
+    facList.innerHTML = Object.keys(groups).map((k) => `<h4 class="stage-title">${esc(k)}</h4>` + groups[k].map((c) => `<label class="facrow"><input type="checkbox" value="${c.id}"> ${esc(c.title)}${c.kind === "elective" ? ' <span class="badge">اختياري</span>' : ""}</label>`).join("")).join("") || '<p class="muted">مفيش مواد.</p>';
+  }
+  facYears.onclick = (e) => { const b = e.target.closest("[data-y]"); if (!b) return; fac.year = Number(b.dataset.y); facDraw(); };
+  facDept.onchange = facDraw;
+  document.getElementById("facAll").onclick = () => { const bs = facList.querySelectorAll("input"); const on = [...bs].some((i) => !i.checked); bs.forEach((i) => (i.checked = on)); };
+  document.getElementById("facAdd").onclick = async () => {
+    const ids = [...facList.querySelectorAll("input:checked")].map((i) => Number(i.value));
+    const msg = document.getElementById("facMsg"), err = document.getElementById("facErr");
+    msg.textContent = ""; err.textContent = "";
+    if (!ids.length) { err.textContent = "علّم على مادة واحدة على الأقل"; return; }
+    try {
+      const r = await api("/courses/from-catalog", { method: "POST", body: JSON.stringify({ catalog_ids: ids }) });
+      msg.textContent = `اتضاف ${r.added} مادة${r.skipped ? "، " + r.skipped + " كانت مضافة قبل كده" : ""}، واتستخرج ${(r.extracted_skills || []).length} مهارة ✅`;
+      facList.querySelectorAll("input").forEach((i) => (i.checked = false));
+      refresh();
+    } catch (e2) { err.textContent = e2.message; }
+  };
+  api("/catalog").then(async (d) => {
+    alive(nav);
+    fac.all = d.catalog; fac.depts = d.departments || [];
+    let mine = "";
+    try { mine = ((await api("/profile")).profile || {}).department || ""; } catch (e) {}
+    facDept.innerHTML = fac.depts.map((x) => `<option value="${x.key}"${x.key === mine ? " selected" : ""}>${esc(x.label)}</option>`).join("");
+    facDraw();
+  }).catch((e) => { if (!(e instanceof Stale)) facList.innerHTML = '<p class="error">تعذر تحميل مواد الكلية</p>'; });
 
   const catalogSelect = document.getElementById("catalogSelect");
   const catalogError = document.getElementById("catalogError");
@@ -364,6 +420,28 @@ async function showJobs() {
   await swr("/careers", nav, draw);
 }
 
+function roadmapHTML(r) {
+  return `<h3>خطة التعلم الكاملة (Roadmap) - ${r.total_skills} مهارة</h3>
+  ${r.stages.map((st) => `
+    <h4 class="stage-title">${esc(st.label)}</h4>
+    <div class="roadmap">${st.skills.map((sk) => `
+      <div class="roadmap-step${sk.have ? " done" : ""}">
+        <div class="step-title">${sk.step}. ${esc(sk.skill_ar || sk.skill)}
+          <span class="muted">(${esc(sk.skill)})</span>
+          ${sk.have ? '<span class="badge">✔ عندك</span>' : ""}</div>
+        ${sk.resources.length
+          ? `<ul>${sk.resources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="badge">${esc(x.kind)}</span></li>`).join("")}</ul>`
+          : '<p class="muted">ابحث عن كورس مجاني في المهارة دي.</p>'}
+      </div>`).join("")}</div>`).join("")}`;
+}
+
+function sourcesHTML(r) {
+  const s = r.sources || [];
+  if (!s.length) return "";
+  return `<div class="card sources"><h4>📚 مصادر المهارات المطلوبة للمسار ده</h4>
+    <ul>${s.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label || x.url)}</a></li>`).join("")}</ul></div>`;
+}
+
 async function showCareer(jobId) {
   showNav("jobs");
   const nav = render("tpl-career");
@@ -375,19 +453,18 @@ async function showCareer(jobId) {
       <h2>${esc(j.title_ar || j.title)}</h2>
       <div class="muted">${esc(j.title)} - ${esc(j.category_label || "")}</div>
       <div class="card"><p>${esc(j.description)}</p>
-        <a class="btn primary" href="#/jobs/${j.id}">حلل فجوتي مع المسار ده</a></div>
-      <h3>خطة التعلم الكاملة (Roadmap) - ${r.total_skills} مهارة</h3>
-      ${r.stages.map((st) => `
-        <h4 class="stage-title">${esc(st.label)}</h4>
-        <div class="roadmap">${st.skills.map((sk) => `
-          <div class="roadmap-step">
-            <div class="step-title">${sk.step}. ${esc(sk.skill_ar || sk.skill)}
-              <span class="muted">(${esc(sk.skill)})</span>
-              ${sk.have ? '<span class="badge">✔ عندك</span>' : ""}</div>
-            ${sk.resources.length
-              ? `<ul>${sk.resources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span class="badge">${esc(x.kind)}</span></li>`).join("")}</ul>`
-              : '<p class="muted">ابحث عن كورس مجاني في المهارة دي.</p>'}
-          </div>`).join("")}</div>`).join("")}`;
+        <a class="btn primary" href="#/jobs/${j.id}">حلل فجوتي مع المسار ده</a>
+        <button class="btn" id="setTarget">🎯 خلّي ده هدفي</button> <span class="success" id="targetMsg"></span></div>
+      ${roadmapHTML(r)}
+      ${sourcesHTML(r)}`;
+    const tb = document.getElementById("setTarget");
+    if (tb) tb.onclick = async () => {
+      try {
+        const pr = (await api("/profile")).profile || {};
+        await api("/profile", { method: "PUT", body: JSON.stringify({ university: pr.university || "", major: pr.major || "", study_year: pr.study_year || "", department: pr.department || "", target_job_id: j.id }) });
+        document.getElementById("targetMsg").textContent = "تم ✅ هتلاقي الخطة في لوحة التحكم";
+      } catch (e) { document.getElementById("targetMsg").textContent = e.message; }
+    };
   });
 }
 
@@ -453,6 +530,7 @@ async function showProfile() {
   form.university.value = p.university || "";
   form.major.value = p.major || "";
   form.study_year.value = p.study_year || "";
+  if (form.department) form.department.value = p.department || "";
   const sel = document.getElementById("targetJobSelect");
   sel.innerHTML =
     '<option value="">اختر وظيفة...</option>' +
@@ -471,6 +549,7 @@ async function showProfile() {
           university: fd.get("university"),
           major: fd.get("major"),
           study_year: fd.get("study_year"),
+          department: fd.get("department") || "",
           target_job_id: fd.get("target_job_id") ? Number(fd.get("target_job_id")) : null,
         }),
       });
