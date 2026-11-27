@@ -107,6 +107,13 @@ CREATE TABLE IF NOT EXISTS course_catalog (
     description TEXT DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS job_sources (
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    url TEXT NOT NULL,
+    PRIMARY KEY (job_id, url)
+);
+
 CREATE TABLE IF NOT EXISTS analyses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -387,7 +394,10 @@ def init_db(app):
         for table, col, ddl in (("live_jobs", "field", "TEXT DEFAULT 'other'"),
                                 ("live_jobs", "country", "TEXT DEFAULT ''"),
                                 ("live_courses", "field", "TEXT DEFAULT 'other'"),
-                                ("live_courses", "pricing", "TEXT DEFAULT 'free'")):
+                                ("live_courses", "pricing", "TEXT DEFAULT 'free'"),
+                                ("course_catalog", "department", "TEXT DEFAULT 'ims'"),
+                                ("course_catalog", "kind", "TEXT DEFAULT 'core'"),
+                                ("profiles", "department", "TEXT DEFAULT ''")):
             if col not in _table_columns(db, table):
                 db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         db.commit()

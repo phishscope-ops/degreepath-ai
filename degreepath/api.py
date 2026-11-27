@@ -103,17 +103,19 @@ def put_profile():
         if not exists:
             return jsonify({"error": "الوظيفة المستهدفة غير موجودة"}), 400
     db.execute(
-        """INSERT INTO profiles (user_id, university, major, study_year, target_job_id)
-           VALUES (?, ?, ?, ?, ?)
+        """INSERT INTO profiles (user_id, university, major, study_year, target_job_id, department)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(user_id) DO UPDATE SET
              university=excluded.university, major=excluded.major,
-             study_year=excluded.study_year, target_job_id=excluded.target_job_id""",
+             study_year=excluded.study_year, target_job_id=excluded.target_job_id,
+             department=excluded.department""",
         (
             g.user["id"],
             (data.get("university") or "").strip(),
             (data.get("major") or "").strip(),
             (data.get("study_year") or "").strip(),
             target,
+            (data.get("department") or "").strip()[:8],
         ),
     )
     db.commit()
@@ -175,28 +177,17 @@ def add_course():
 def catalog():
     db = get_db()
     rows = _cached_rows(
-        db, "SELECT id, title, level, semester, description FROM course_catalog ORDER BY level, semester, id")
-    return jsonify({"catalog": [dict(r) for r in rows]})
+        db, "SELECT id, title, level, semester, description, department, kind FROM course_catalog "
+            "ORDER BY department, level, semester, id")
+    from .catalog2 import DEPARTMENTS
+    return jsonify({"catalog": [dict(r) for r in rows],
+                    "departments": [{"key": k, "label": v} for k, v in DEPARTMENTS]})
 
 
-@bp.post("/courses/from-catalog")
-@login_required
-def add_from_catalog():
-    data = request.get_json(silent=True) or {}
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM course_catalog WHERE id = ?", (data.get("catalog_id"),)
-    ).fetchone()
-    if row is None:
-        return jsonify({"error": "المادة غير موجودة في القائمة"}), 404
-    dup = db.execute(
-        "SELECT 1 FROM courses WHERE user_id = ? AND title = ?", (g.user["id"], row["title"])
-    ).fetchone()
-    if dup:
-        return jsonify({"error": "المادة دي مضافة عندك قبل كده"}), 409
+def _insert_course_from_row(db, user_id, row):
     cur = db.execute(
         "INSERT INTO courses (user_id, title, description, kind) VALUES (?, ?, ?, 'course')",
-        (g.user["id"], row["title"], row["description"]),
+        (user_id, row["title"], row["description"]),
     )
     cid = cur.lastrowid
     skills = nlp.extract_skills_hybrid(f"{row['title']}. {row['description']}", db)
@@ -205,8 +196,42 @@ def add_from_catalog():
             "INSERT OR IGNORE INTO course_skills (course_id, skill_id) VALUES (?, ?)",
             (cid, s["id"]),
         )
+    return cid, skills
+
+
+@bp.post("/courses/from-catalog")
+@login_required
+def add_from_catalog():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    ids = data.get("catalog_ids")
+    if ids is None:
+        ids = [data.get("catalog_id")]
+    ids = [i for i in ids if isinstance(i, int)][:80]
+    if not ids:
+        return jsonify({"error": "اختار مادة الأول"}), 400
+    added, skipped, all_skills = [], 0, {}
+    for cat_id in ids:
+        row = db.execute("SELECT * FROM course_catalog WHERE id = ?", (cat_id,)).fetchone()
+        if row is None:
+            if len(ids) == 1:
+                return jsonify({"error": "المادة غير موجودة في القائمة"}), 404
+            continue
+        dup = db.execute(
+            "SELECT 1 FROM courses WHERE user_id = ? AND title = ?", (g.user["id"], row["title"])
+        ).fetchone()
+        if dup:
+            if len(ids) == 1:
+                return jsonify({"error": "المادة دي مضافة عندك قبل كده"}), 409
+            skipped += 1
+            continue
+        cid, skills = _insert_course_from_row(db, g.user["id"], row)
+        added.append(cid)
+        for s in skills:
+            all_skills[s["id"]] = s
     db.commit()
-    return jsonify({"id": cid, "extracted_skills": skills}), 201
+    return jsonify({"id": added[0] if added else None, "added": len(added), "skipped": skipped,
+                    "extracted_skills": list(all_skills.values())}), 201
 
 
 @bp.delete("/courses/<int:course_id>")
@@ -302,7 +327,7 @@ CATEGORY_LABELS = {
     "web": "تطوير الويب", "software": "هندسة البرمجيات", "mobile": "تطبيقات الموبايل",
     "data": "البيانات", "ai": "الذكاء الاصطناعي", "security": "الأمن السيبراني",
     "cloud": "السحابة و DevOps", "it": "الدعم الفني والشبكات", "business": "الأعمال والتحليل",
-    "design": "التصميم", "databases": "قواعد البيانات", "games": "الألعاب", "web3": "بلوك تشين",
+    "design": "التصميم", "finance": "المحاسبة والمالية", "iot": "إنترنت الأشياء", "databases": "قواعد البيانات", "games": "الألعاب", "web3": "بلوك تشين",
 }
 
 
@@ -358,6 +383,8 @@ def career_detail(job_id):
     if r is None:
         return jsonify({"error": "الوظيفة غير موجودة"}), 404
     r["job"]["category_label"] = CATEGORY_LABELS.get(r["job"]["category"], r["job"]["category"])
+    r["sources"] = [dict(x) for x in db.execute(
+        "SELECT label, url FROM job_sources WHERE job_id = ? ORDER BY label", (job_id,)).fetchall()]
     return jsonify(r)
 
 

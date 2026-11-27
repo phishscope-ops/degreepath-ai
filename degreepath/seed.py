@@ -513,4 +513,7 @@ def seed_if_empty(db):
                 (sid, title, url, kind),
             )
 
+    from .seed_v2 import apply_v2
+
+    apply_v2(db, skill_id)
     db.commit()
